@@ -5,7 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -23,13 +22,12 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-
     <SidebarProvider>
       <div className="flex h-screen w-screen">
         <DashboardSidebar user={{ name: "Priyank Suthar" }} />
 
         <div className="flex-1 flex flex-col">
-          <header className="flex items-center justify-between bg-purple-600 px-6 py-4 text-white rounded rounded-l-2xl">
+          <header className="flex items-center justify-between bg-gradient-to-r from-[#7B2991] to-[#4F2D82]  px-6 py-4 text-white rounded rounded-l-2xl">
             <div className="space-x-3 flex">
               <button>
                 <Menu className="self-center" />
@@ -51,6 +49,5 @@ export default function RootLayout({ children }) {
         </div>
       </div>
     </SidebarProvider>
-
   );
 }

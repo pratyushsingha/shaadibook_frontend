@@ -162,21 +162,86 @@ export default function AlbumForm() {
   const handleUploadToS3 = async () => {
     setIsUploading(true);
     setProgress(0);
-
+  
     try {
       const payload = {
-        categories: categories.map((category) => ({
-          name: category.name,
-          files: category.files.map((file) => ({
-            fileName: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-          })),
-        })),
+        name: "Album + Sexy", // Replace with your dynamic album name
+        contactPerson: ["Pratyush Singha", "Angshu Roy"], // Replace with dynamic contact person list
+        action: "E_ALBUM",
+        song: "song.mp3", // Handle song upload separately if required
+        emailIds: ["john@example.com"], // Replace with dynamic email IDs
+        images: [],
+        profileAttached: false, // Adjust this value based on your logic
+        isSingleSlided: true, // Adjust this value based on your logic
       };
-
-      const response = await fetch(
+  
+      // Get presigned URLs for all files
+      const presignedResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/get-presigned-urls`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            categories: categories.map((category) => ({
+              name: category.name,
+              files: category.files.map((file) => ({
+                fileName: file.name,
+                contentType: file.type,
+                fileSize: file.size,
+              })),
+            })),
+          }),
+        }
+      );
+  
+      if (!presignedResponse.ok) {
+        throw new Error("Failed to get presigned URLs");
+      }
+  
+      const presignedData = await presignedResponse.json();
+  
+      let uploadedFiles = 0;
+      const totalFiles = categories.reduce(
+        (acc, category) => acc + category.files.length,
+        0
+      );
+  
+      // Upload files to S3 and collect their keys
+      for (const categoryData of presignedData.data) {
+        const category = categories.find(
+          (cat) => cat.name === categoryData.category
+        );
+        const images = [];
+  
+        for (const fileData of categoryData.files) {
+          const file = category.files.find((f) => f.name === fileData.fileName);
+  
+          // Upload file chunks to S3
+          await uploadFileChunks(fileData, file);
+  
+          // Collect image key and MIME type
+          images.push({
+            key: fileData.key,
+            mimeType: file.type,
+          });
+  
+          uploadedFiles++;
+          setProgress(Math.round((uploadedFiles / totalFiles) * 100));
+        }
+  
+        // Add category with its images to the payload
+        payload.images.push({
+          category: categoryData.category,
+          images,
+        });
+      }
+  
+      // Create album after all files are uploaded
+      const createResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/create`,
         {
           method: "POST",
           headers: {
@@ -186,120 +251,154 @@ export default function AlbumForm() {
           body: JSON.stringify(payload),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to get presigned URLs");
+  
+      if (!createResponse.ok) {
+        throw new Error("Failed to create album");
       }
-
-      const data = await response.json();
-
-      let uploadedFiles = 0;
-      const totalFiles = categories.reduce(
-        (acc, category) => acc + category.files.length,
-        0
-      );
-
-      for (const categoryData of data.data) {
-        const category = categories.find(
-          (cat) => cat.name === categoryData.category
-        );
-        console.log(category);
-        for (const fileData of categoryData.files) {
-          const file = category.files.find((f) => f.name == fileData.fileName);
-          console.log(fileData);
-          await uploadFileChunks(fileData, file);
-
-          uploadedFiles++;
-          setProgress(Math.round((uploadedFiles / totalFiles) * 100));
-        }
-      }
-
-      setCategories(
-        categories.map((category) => ({
-          ...category,
-          uploaded: true,
-        }))
-      );
+  
+      const createData = await createResponse.json();
+      console.log("Album created successfully:", createData);
+  
+      // Update UI or show success message
     } catch (error) {
-      console.error("Error uploading files:", error);
+      console.error("Error uploading files or creating album:", error);
       // Add user-friendly error handling here
     } finally {
       setIsUploading(false);
     }
   };
+  
 
   // Rest of the component remains the same
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader className="bg-purple-700 text-white">
-        <CardTitle>Album Form</CardTitle>
-        <CardDescription className="text-white">
-          Create and manage your album categories and upload images.
-        </CardDescription>
+    <Card className="w-full max-w-6xl mx-auto bg-white shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between bg-purple-600 text-white p-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" className="text-white hover:text-white/90">
+            Back
+          </Button>
+          <CardTitle className="text-lg font-medium">Akash + Anjali</CardTitle>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm">
+            Copy And Share
+          </Button>
+          <Button variant="secondary" size="sm">
+            Save Album
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent>
-        <section className="mt-6">
-          <h3 className="font-semibold">Upload Album Images</h3>
+      <CardContent className="p-6 space-y-8">
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold">
+            Add More Details About Album
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Studio Name</label>
+              <Input placeholder="Enter Studio Name" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Studio Contact Person
+              </label>
+              <Input placeholder="Enter Customer Name" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Email IDs (separate by comma)
+              </label>
+              <Input placeholder="Enter Email IDs" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Song (Will play while viewing album)
+              </label>
+              <Input type="file" accept="audio/*" />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Upload Album Images</h3>
+            <Button variant="outline" size="sm" onClick={handleAddCategory}>
+              <Plus className="w-4 h-4 mr-1" /> Add New Category
+            </Button>
+          </div>
           {categories.map((category, categoryIndex) => (
-            <div key={categoryIndex} className="mt-4">
+            <div
+              key={categoryIndex}
+              className="border rounded-lg p-4 space-y-4"
+            >
               <div className="flex justify-between items-center">
-                <h4 className="font-semibold">{category.name}</h4>
+                <h4 className="font-medium text-gray-900">{category.name}</h4>
                 {category.uploaded && (
-                  <span className="text-green-500 font-medium">Uploaded</span>
+                  <span className="text-green-600 text-sm font-medium">
+                    Uploaded
+                  </span>
                 )}
               </div>
-              <Input
-                type="file"
-                multiple
-                onChange={(e) =>
-                  handleFileUpload(e.target.files, categoryIndex)
-                }
-                disabled={isUploading || category.uploaded}
-              />
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {category.files.map((file, fileIndex) => (
-                  <div
-                    key={fileIndex}
-                    className="relative border p-2 rounded-md"
-                  >
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={`Preview ${file.name}`}
-                      className="w-20 h-20 object-cover rounded-md"
-                    />
-                    <Button
-                      className="absolute top-0 right-0 p-0 rounded-full bg-red-500"
-                      size="sm"
-                      onClick={() => handleRemoveFile(categoryIndex, fileIndex)}
-                    >
-                      <Trash2 size={16} className="text-white" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="grid gap-4">
+                <Input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="border-dashed"
+                  onChange={(e) =>
+                    handleFileUpload(e.target.files, categoryIndex)
+                  }
+                  disabled={isUploading || category.uploaded}
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {category.files.map((file, fileIndex) => (
+                    <div key={fileIndex} className="relative aspect-square">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Preview ${file.name}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <Button
+                        className="absolute top-2 right-2 h-6 w-6 p-0 rounded-full bg-red-500 hover:bg-red-600"
+                        onClick={() =>
+                          handleRemoveFile(categoryIndex, fileIndex)
+                        }
+                      >
+                        <Trash2 className="h-4 w-4 text-white" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ))}
-          <Button
-            onClick={handleAddCategory}
-            className="mt-4"
-            disabled={isUploading}
-          >
-            <Plus className="mr-2" size={16} />
-            Add New Category
-          </Button>
-        </section>
+        </div>
 
         {isUploading && (
-          <div className="mt-4">
-            <p>Uploading... {progress}%</p>
+          <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-full bg-purple-200 rounded-full h-2.5">
+                <div
+                  className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <span className="text-sm font-medium text-purple-600">
+                {progress}%
+              </span>
+            </div>
           </div>
         )}
 
-        <section className="mt-6 flex justify-between items-center">
-          <Button onClick={handleUploadToS3} disabled={isUploading}>
-            Upload to S3
+        <div className="flex justify-end mt-6">
+          <Button
+            onClick={handleUploadToS3}
+            disabled={isUploading}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            {isUploading ? "Uploading..." : "Upload to S3"}
           </Button>
-        </section>
+        </div>
       </CardContent>
     </Card>
   );

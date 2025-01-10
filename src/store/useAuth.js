@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const useAuth = create((set) => ({
   user: null,
