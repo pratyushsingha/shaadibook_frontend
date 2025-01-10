@@ -86,31 +86,67 @@ export default function CreateAlbumPage() {
     },
   });
 
-  const compressImage = async (file, quality = 0.5) => {
-    const image = new Image();
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const objectURL = URL.createObjectURL(file);
-    image.src = objectURL;
+  const compressImage = async (file, maxSize = 500 * 1024) => {
+    const compress = (file, quality, width, height) =>
+      new Promise((resolve) => {
+        const image = new Image();
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const objectURL = URL.createObjectURL(file);
 
-    return new Promise((resolve) => {
+        image.src = objectURL;
+
+        image.onload = () => {
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(image, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              const compressedFile = new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+      });
+
+    const image = new Image();
+    const objectURL = URL.createObjectURL(file);
+
+    const originalDimensions = await new Promise((resolve) => {
       image.onload = () => {
-        canvas.width = image.width;
-        canvas.height = image.height;
-        ctx.drawImage(image, 0, 0);
-        canvas.toBlob(
-          (blob) => {
-            const compressedFile = new File([blob], file.name, {
-              type: "image/jpeg",
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          },
-          "image/jpeg",
-          quality
-        );
+        resolve({ width: image.width, height: image.height });
       };
+      image.src = objectURL;
     });
+
+    let { width, height } = originalDimensions;
+    let quality = 0.9; 
+    let compressedFile = await compress(file, quality, width, height);
+
+    while (compressedFile.size > maxSize && quality > 0.1) {
+      if (compressedFile.size > maxSize && width > 300 && height > 300) {
+        width = Math.floor(width * 0.9);
+        height = Math.floor(height * 0.9);
+      }
+      quality -= 0.1;
+      compressedFile = await compress(file, quality, width, height);
+    }
+
+    if (compressedFile.size > maxSize) {
+      console.warn(
+        `Could not compress ${file.name} below ${
+          maxSize / 1024
+        } KB. Final size: ${compressedFile.size / 1024} KB`
+      );
+    }
+
+    return compressedFile;
   };
 
   const handleFileUpload = async (files, categoryIndex) => {
@@ -613,7 +649,6 @@ export default function CreateAlbumPage() {
                         </div>
                       ))}
                     </div>
-
                     {isUploading && (
                       <div className="mt-4 p-4 bg-purple-50 rounded-lg">
                         <div className="flex items-center gap-2">
