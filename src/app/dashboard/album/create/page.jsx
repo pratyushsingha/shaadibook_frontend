@@ -277,7 +277,7 @@ export default function CreateAlbumPage() {
           },
           i,
           totalBatches,
-          updatePreview 
+          updatePreview
         );
 
         if (window.gc) {
@@ -306,19 +306,39 @@ export default function CreateAlbumPage() {
     }
   };
 
-  const uploadSingleImage = async (file, albumPin, category, fileName, fileIndex) => {
-    // Check if we're dealing with a compressed file object from earlier processing
+  const uploadSingleImage = async (
+    file,
+    albumPin,
+    category,
+    fileName,
+    fileIndex
+  ) => {
     const actualFile = file.file || file;
     const fileId = `${category}-${fileName}-${fileIndex}`;
-    
-    // Create FormData and append the actual file
+
+    // Add file size check
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB example limit
+    if (actualFile.size > MAX_FILE_SIZE) {
+      throw new Error(
+        `File ${fileName} is too large. Maximum size is ${
+          MAX_FILE_SIZE / (1024 * 1024)
+        }MB`
+      );
+    }
+
     const formData = new FormData();
     formData.append("image", actualFile);
     formData.append("albumPin", albumPin);
-  
+
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-  
+
+      // Add timeout handling
+      xhr.timeout = 30000; // 30 seconds timeout
+      xhr.ontimeout = () => {
+        reject(new Error(`Upload timed out for ${fileName}`));
+      };
+
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded * 100) / event.total);
@@ -328,7 +348,7 @@ export default function CreateAlbumPage() {
           }));
         }
       });
-  
+
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           setUploadProgress((prev) => ({
@@ -337,17 +357,21 @@ export default function CreateAlbumPage() {
           }));
           resolve(JSON.parse(xhr.response));
         } else {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
+          reject(
+            new Error(`Upload failed for ${fileName} with status ${xhr.status}`)
+          );
         }
       };
-  
-      xhr.onerror = () => reject(new Error("Upload failed"));
-  
+
+      xhr.onerror = () => {
+        reject(new Error(`Network error while uploading ${fileName}`));
+      };
+
       xhr.open("POST", `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`);
       xhr.send(formData);
     });
-  };  
-
+  };
+  
   const getTotalFiles = () => {
     return categories.reduce(
       (total, category) => total + category.files.length,
@@ -360,7 +384,7 @@ export default function CreateAlbumPage() {
     setTotalProgress(0);
     const albumPin = generateCode();
     const uploadResponses = [];
-    const UPLOAD_CHUNK_SIZE = 1; 
+    const UPLOAD_CHUNK_SIZE = 1;
     const uploadToastId = toast({
       title: "Starting Upload",
       description: "Preparing files...",
