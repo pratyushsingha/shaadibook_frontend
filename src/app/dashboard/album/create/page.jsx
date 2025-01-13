@@ -362,7 +362,7 @@ export default function CreateAlbumPage() {
     setTotalProgress(0);
     const albumPin = generateCode();
     const uploadResponses = [];
-    const UPLOAD_CHUNK_SIZE = 10; 
+    const UPLOAD_CHUNK_SIZE = 1; 
     const uploadToastId = toast({
       title: "Starting Upload",
       description: "Preparing files...",
