@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Plus, Trash2, Loader2, Mail } from "lucide-react";
+import { Search, Loader2, Mail, Plus } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -16,26 +16,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import AlbumDetailsCard from "@/components/AlbumDetailsCard";
-import { nanoid } from "nanoid";
-import imageCompression from "browser-image-compression";
+import Compressor from "compressorjs";
+import { Label } from "@/components/ui/label";
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import AlbumDetailsCard from "@/components/AlbumDetailsCard";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 
 const formSchema = z.object({
   studioName: z.string().min(2, {
@@ -63,8 +62,18 @@ const formSchema = z.object({
   singleSided: z.boolean().default(false),
 });
 
+const CompressionToast = () => (
+  <div className="flex items-center space-x-2">
+    <Loader2 className="h-4 w-4 animate-spin" />
+    <span>
+      Compressing images
+      <span className="text-sm text-muted-foreground ml-1">Please wait...</span>
+    </span>
+  </div>
+);
+
 export default function CreateAlbumPage() {
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -72,8 +81,9 @@ export default function CreateAlbumPage() {
     { name: "Engagement", files: [], uploaded: false },
   ]);
   const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [compressLoader, setCompressLoader] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const compressionToastId = useRef(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -92,127 +102,90 @@ export default function CreateAlbumPage() {
     },
   });
 
-  // const compressImage = async (file, maxSize = 500 * 1024) => {
-  //   try {
-  //     const options = {
-  //       maxSizeMB: maxSize / (1024 * 1024), // Convert max size to MB
-  //       maxWidthOrHeight: 1000, // Set a max dimension to prevent excessive resizing
-  //       useWebWorker: true, // Use web workers for offloading tasks
-  //     };
-
-  //     const compressedFile = await imageCompression(file, options);
-
-  //     if (compressedFile.size > maxSize) {
-  //       console.warn(
-  //         `Image could not be compressed to the target size. Final size: ${
-  //           compressedFile.size / 1024
-  //         } KB`
-  //       );
-  //     }
-
-  //     return compressedFile;
-  //   } catch (error) {
-  //     console.error("Error compressing image:", error);
-  //     return file; // Return original file if compression fails
-  //   }
-  // };
-
-  // const compressImage = async (file, maxSize = 500 * 1024) => {
-  //   const compress = (file, quality, width, height) =>
-  //     new Promise((resolve) => {
-  //       const image = new Image();
-  //       const canvas = document.createElement("canvas");
-  //       const ctx = canvas.getContext("2d");
-  //       const objectURL = URL.createObjectURL(file);
-
-  //       image.src = objectURL;
-
-  //       image.onload = () => {
-  //         canvas.width = width;
-  //         canvas.height = height;
-  //         ctx.drawImage(image, 0, 0, width, height);
-
-  //         canvas.toBlob(
-  //           (blob) => {
-  //             const compressedFile = new File([blob], file.name, {
-  //               type: "image/jpeg",
-  //               lastModified: Date.now(),
-  //             });
-  //             resolve(compressedFile);
-  //           },
-  //           "image/jpeg",
-  //           quality
-  //         );
-  //       };
-  //     });
-
-  //   const image = new Image();
-  //   const objectURL = URL.createObjectURL(file);
-
-  //   const originalDimensions = await new Promise((resolve) => {
-  //     image.onload = () => {
-  //       resolve({ width: image.width, height: image.height });
-  //     };
-  //     image.src = objectURL;
-  //   });
-
-  //   let { width, height } = originalDimensions;
-  //   let quality = 0.9;
-  //   let compressedFile = await compress(file, quality, width, height);
-
-  //   while (compressedFile.size > maxSize && quality > 0.1) {
-  //     if (compressedFile.size > maxSize && width > 300 && height > 300) {
-  //       width = Math.floor(width * 0.9);
-  //       height = Math.floor(height * 0.9);
-  //     }
-  //     quality -= 0.1;
-  //     compressedFile = await compress(file, quality, width, height);
-  //   }
-
-  //   if (compressedFile.size > maxSize) {
-  //     console.warn(
-  //       `Could not compress ${file.name} below ${
-  //         maxSize / 1024
-  //       } KB. Final size: ${compressedFile.size / 1024} KB`
-  //     );
-  //   }
-
-  //   return compressedFile;
-  // };
-
-  const handleFileUpload = async (files, categoryIndex) => {
-    const updatedCategories = [...categories];
-
-    // If the category exists, update it
-    if (categoryIndex !== null && updatedCategories[categoryIndex]) {
-      const category = updatedCategories[categoryIndex];
-
-      // Optional: Compress files before adding (uncomment if needed)
-      // setCompressLoader(true);
-      // const compressedFiles = await Promise.all(
-      //   Array.from(files).map((file) => compressImage(file))
-      // );
-      // setCompressLoader(false);
-
-      // Add the new files to the existing category
-      category.files = [...category.files, ...files];
-    } else {
-      // If no category exists for the given index, create a new category
-      const newCategory = {
-        name: `Category ${updatedCategories.length + 1}`,
-        files: [...files],
-        uploaded: false,
-      };
-
-      updatedCategories.push(newCategory); // Add the new category at the end
+  const showCompressionToast = () => {
+    if (compressionToastId.current) {
+      dismiss(compressionToastId.current);
     }
 
-    setCategories(updatedCategories); // Update the categories state
+    const { id } = toast({
+      title: "Processing Images",
+      description: <CompressionToast />,
+      duration: Infinity,
+    });
+
+    compressionToastId.current = id;
+    return id;
   };
 
-  const handleRemoveFile = (categoryIndex, fileIndex) => {
+  const compressImage = async (file, quality = 0.2, convertSize = 5000000) => {
+    if (!(file instanceof File || file instanceof Blob)) {
+      return file;
+    }
+
+    if ("preview" in file) {
+      return file.file;
+    }
+
+    return new Promise((resolve, reject) => {
+      new Compressor(file, {
+        quality,
+        convertSize,
+        success(result) {
+          resolve(result);
+        },
+        error(err) {
+          reject(err);
+        },
+      });
+    });
+  };
+
+  const handleFileUpload = async (files, categoryIndex) => {
+    setCompressLoader(true);
+    const toastId = showCompressionToast();
+
+    try {
+      const updatedCategories = [...categories];
+      const category = updatedCategories[categoryIndex];
+
+      const compressedFiles = await Promise.all(
+        Array.from(files).map(async (file) => {
+          if (!(file instanceof File || file instanceof Blob)) {
+            throw new Error("Invalid file input for compression.");
+          }
+          const compressedFile = await compressImage(file);
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
+            name: file.name,
+          };
+        })
+      );
+
+      category.files = [...category.files, ...compressedFiles];
+      setCategories(updatedCategories);
+
+      dismiss(toastId);
+    } catch (error) {
+      dismiss(toastId);
+      toast({
+        title: "Error processing images",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCompressLoader(false);
+      compressionToastId.current = null;
+    }
+  };
+
+  const handleRemoveImage = (categoryIndex, fileIndex) => {
     const updatedCategories = [...categories];
-    updatedCategories[categoryIndex].files.splice(fileIndex, 1);
+    const category = updatedCategories[categoryIndex];
+
+    URL.revokeObjectURL(category.files[fileIndex].preview);
+
+    category.files.splice(fileIndex, 1);
     setCategories(updatedCategories);
   };
 
@@ -226,28 +199,6 @@ export default function CreateAlbumPage() {
     }
   };
 
-  const uploadFiles = async (files, albumPin) => {
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append("images", file);
-    });
-    formData.append("albumPin", albumPin);
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to upload files");
-    }
-
-    return await response.json();
-  };
-
   const generateCode = () => {
     const timestamp = Math.floor(Date.now() / 1000);
     return `${timestamp}`;
@@ -255,40 +206,106 @@ export default function CreateAlbumPage() {
 
   const handleUpload = async (values) => {
     setIsUploading(true);
-    setProgress(0);
+    const albumPin = generateCode();
 
     try {
-      const albumPin = generateCode(); 
+      const compressedFilesByCategory = await Promise.all(
+        categories.map(async (category) => ({
+          category: category.name,
+          files: await Promise.all(
+            category.files.map(async (fileObj) => {
+              const compressedFile = await compressImage(
+                fileObj.file,
+                0.4,
+                5000000
+              );
+              compressedFile.name = fileObj.name;
+              return compressedFile;
+            })
+          ),
+        }))
+      );
 
-      const allFiles = categories.flatMap((category) => category.files);
-      const totalFiles = allFiles.length;
+      const uploadResponses = [];
 
-      const uploadResult = await uploadFiles(allFiles, albumPin);
+      for (const { category, files } of compressedFilesByCategory) {
+        for (const [index, file] of files.entries()) {
+          const formData = new FormData();
+          formData.append("image", file);
+          formData.append("albumPin", albumPin);
 
-      setProgress(50);
+          const fileName = file.name || `file-${index}`;
+          const fileId = `${category}-${fileName}-${index}`;
 
-      let fileIndex = 0;
+          try {
+            const xhr = new XMLHttpRequest();
+
+            const uploadPromise = new Promise((resolve, reject) => {
+              xhr.upload.addEventListener("progress", (event) => {
+                if (event.lengthComputable) {
+                  const progress = Math.round(
+                    (event.loaded * 100) / event.total
+                  );
+                  setUploadProgress((prev) => ({
+                    ...prev,
+                    [fileId]: progress,
+                  }));
+                }
+              });
+
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  setUploadProgress((prev) => ({
+                    ...prev,
+                    [fileId]: 100,
+                  }));
+                  resolve(JSON.parse(xhr.response));
+                } else {
+                  reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+              };
+
+              xhr.onerror = () => {
+                reject(new Error("Upload failed"));
+              };
+            });
+
+            xhr.open(
+              "POST",
+              `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`
+            );
+            xhr.send(formData);
+
+            const response = await uploadPromise;
+            uploadResponses.push(response);
+          } catch (error) {
+            console.error(`Error uploading ${fileName}:`, error);
+            toast({
+              title: `Failed to upload ${fileName}`,
+              description: error.message,
+              variant: "destructive",
+            });
+          }
+        }
+      }
+
       const categoryImages = categories.map((category) => ({
         category: category.name,
-        images: category.files.map(() => {
-          const imageKey = uploadResult.data[fileIndex++];
-          return {
-            key: imageKey,
-            mimeType: "image/jpeg", 
-          };
-        }),
+        images: category.files.map((fileObj) => ({
+          key: fileObj.name,
+          mimeType: fileObj.file.type || "image/jpeg",
+        })),
       }));
 
       const albumPayload = {
         name: title,
         contactPerson: [values.contactPerson1, values.contactPerson2],
-        action: "E_ALBUM",
-        song: "song.mp3",
-        emailIds: [values.emailIds],
+        emailIds: values.emailIds.split(",").map((email) => email.trim()),
         images: categoryImages,
         profileAttached: values.attachProfile,
         isSingleSlided: values.singleSided,
         code: albumPin,
+        action: "E_ALBUM",
       };
 
       const createResponse = await fetch(
@@ -309,23 +326,29 @@ export default function CreateAlbumPage() {
 
       const createData = await createResponse.json();
       setAlbum(createData.data);
-      setProgress(100); 
       setIsDialogOpen(true);
-      toast({
-        title: "Album created successfully",
-      });
+      toast({ title: "Album created successfully" });
     } catch (error) {
-      console.error(error);
+      console.error("Album creation error:", error);
       toast({
         title: "Failed to create album",
-        message: error.message,
+        description: error.message,
         variant: "destructive",
       });
     } finally {
       setIsUploading(false);
-      form.reset();
     }
   };
+
+  useEffect(() => {
+    return () => {
+      categories.forEach((category) => {
+        category.files.forEach((fileObj) => {
+          URL.revokeObjectURL(fileObj.preview);
+        });
+      });
+    };
+  }, []);
 
   return (
     <>
@@ -501,7 +524,6 @@ export default function CreateAlbumPage() {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-medium">Upload Album Images</h3>
                       <div className="flex space-x-3">
-                        {compressLoader && <Loader2 className="animate-spin" />}
                         <Button
                           type="button"
                           variant="outline"
@@ -512,36 +534,24 @@ export default function CreateAlbumPage() {
                         </Button>
                       </div>
                     </div>
-                    <Accordion type="single" collapsible className="w-full ">
-                      {categories.map((category, categoryIndex) => (
+                    {categories.map((category, categoryIndex) => (
+                      <Accordion
+                        type="single"
+                        collapsible
+                        className="w-full"
+                        key={categoryIndex}
+                      >
                         <AccordionItem value={`${categoryIndex}`}>
-                          <div
-                            key={categoryIndex}
-                            className="border rounded-lg p-4 space-y-4 mb-3 bg-[#FBF9FC]"
-                          >
+                          <div className="border rounded-lg p-4 space-y-4 mb-3 bg-[#FBF9FC]">
                             <div className="flex justify-between items-center">
                               <AccordionTrigger>
-                                <h4 className="font-medium text-gray-900">
+                                <h4 className="font-semibold text-xl text-gray-900">
                                   {category.name}
                                 </h4>
                               </AccordionTrigger>
-                              {category.uploaded && (
-                                <span className="text-green-600 text-sm font-medium">
-                                  Uploaded
-                                </span>
-                              )}
                             </div>
 
                             <div className="grid gap-4">
-                              {/* <Input
-                              type="file"
-                              multiple
-                              className="border-dashed"
-                              onChange={(e) =>
-                                handleFileUpload(e.target.files, categoryIndex)
-                              }
-                              disabled={isUploading || category.uploaded}
-                            /> */}
                               <FileUpload
                                 onChange={(files) =>
                                   handleFileUpload(files, categoryIndex)
@@ -550,24 +560,58 @@ export default function CreateAlbumPage() {
                                 multiple
                                 disabled={isUploading}
                               />
+
+                              {category.files.length > 0 && (
+                                <div className="mt-6 space-y-4">
+                                  <h3 className="text-lg font-semibold">
+                                    Uploaded Files
+                                  </h3>
+                                  <div className="flex flex-wrap gap-4">
+                                    {category.files.map((file, fileIndex) => {
+                                      const fileId = `${category.name}-${file.name}-${fileIndex}`;
+                                      const progress =
+                                        uploadProgress[fileId] || 0;
+                                      return (
+                                        <div
+                                          key={fileId}
+                                          className="w-1/4 p-2 mx-auto"
+                                        >
+                                          <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                              <div className="flex flex-col items-center w-full">
+                                                <img
+                                                  loading="lazy"
+                                                  className="w-full h-40 object-cover rounded"
+                                                  src={file.preview}
+                                                  alt={file.name}
+                                                />
+                                                <span className="text-sm text-gray-600">
+                                                  {file.name}
+                                                </span>
+                                                <div className="w-full flex space-x-2">
+                                                  <span className="text-sm text-gray-600">
+                                                    {progress}%
+                                                  </span>
+                                                  <Progress
+                                                    value={progress}
+                                                    max={100}
+                                                    className="h-2 self-center"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </AccordionItem>
-                      ))}
-                    </Accordion>
-                    {isUploading && (
-                      <div className="w-full mt-4">
-                        <div className="h-2 bg-gray-200 rounded-full">
-                          <div
-                            className="h-2 bg-blue-600 rounded-full"
-                            style={{ width: `${progress}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-2">
-                          {Math.round(progress)}%
-                        </p>
-                      </div>
-                    )}
+                      </Accordion>
+                    ))}
                   </div>
                 </div>
               </form>

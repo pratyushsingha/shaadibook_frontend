@@ -62,7 +62,7 @@ export const FileUpload = ({ onChange }) => {
             type="file"
             onChange={(e) => handleFileChange(Array.from(e.target.files || []))}
             className="hidden"
-            multiple // Allow multiple file selection
+            multiple
           />
           <div className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,white,transparent)]">
             <GridPattern />
@@ -74,7 +74,7 @@ export const FileUpload = ({ onChange }) => {
             <p className="relative z-20 font-sans font-normal text-neutral-400 dark:text-neutral-400 text-base mt-2">
               Drag or drop your files here or click to upload
             </p>
-            <div className="relative w-full mt-10 max-w-xl mx-auto">
+            {/* <div className="relative w-full mt-10 max-w-xl mx-auto">
               {files.length > 0 &&
                 files.map((file, idx) => (
                   <motion.div
@@ -160,7 +160,7 @@ export const FileUpload = ({ onChange }) => {
                   className="absolute opacity-0 border border-dashed border-sky-400 inset-0 z-30 bg-transparent flex items-center justify-center h-32 mt-4 w-full max-w-[8rem] mx-auto rounded-md"
                 ></motion.div>
               )}
-            </div>
+            </div> */}
           </div>
         </motion.div>
       </div>
