@@ -29,6 +29,7 @@ import Compressor from "compressorjs";
 import { Label } from "@/components/ui/label";
 import {
   Accordion,
+  AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
@@ -550,64 +551,65 @@ export default function CreateAlbumPage() {
                                 </h4>
                               </AccordionTrigger>
                             </div>
+                            <AccordionContent>
+                              <div className="grid gap-4">
+                                <FileUpload
+                                  onChange={(files) =>
+                                    handleFileUpload(files, categoryIndex)
+                                  }
+                                  accept="image/*"
+                                  multiple
+                                  disabled={isUploading}
+                                />
 
-                            <div className="grid gap-4">
-                              <FileUpload
-                                onChange={(files) =>
-                                  handleFileUpload(files, categoryIndex)
-                                }
-                                accept="image/*"
-                                multiple
-                                disabled={isUploading}
-                              />
-
-                              {category.files.length > 0 && (
-                                <div className="mt-6 space-y-4">
-                                  <h3 className="text-lg font-semibold">
-                                    Uploaded Files
-                                  </h3>
-                                  <div className="flex flex-wrap gap-4">
-                                    {category.files.map((file, fileIndex) => {
-                                      const fileId = `${category.name}-${file.name}-${fileIndex}`;
-                                      const progress =
-                                        uploadProgress[fileId] || 0;
-                                      return (
-                                        <div
-                                          key={fileId}
-                                          className="w-1/4 p-2 mx-auto"
-                                        >
-                                          <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                              <div className="flex flex-col items-center w-full">
-                                                <img
-                                                  loading="lazy"
-                                                  className="w-full h-40 object-cover rounded"
-                                                  src={file.preview}
-                                                  alt={file.name}
-                                                />
-                                                <span className="text-sm text-gray-600">
-                                                  {file.name}
-                                                </span>
-                                                <div className="w-full flex space-x-2">
-                                                  <span className="text-sm text-gray-600">
-                                                    {progress}%
-                                                  </span>
-                                                  <Progress
-                                                    value={progress}
-                                                    max={100}
-                                                    className="h-2 self-center"
+                                {category.files.length > 0 && (
+                                  <div className="mt-6 space-y-4">
+                                    <h3 className="text-lg font-semibold">
+                                      Uploaded Files
+                                    </h3>
+                                    <div className="flex flex-wrap gap-4">
+                                      {category.files.map((file, fileIndex) => {
+                                        const fileId = `${category.name}-${file.name}-${fileIndex}`;
+                                        const progress =
+                                          uploadProgress[fileId] || 0;
+                                        return (
+                                          <div
+                                            key={fileId}
+                                            className="w-1/4 p-2 mx-auto"
+                                          >
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between items-center">
+                                                <div className="flex flex-col items-center w-full">
+                                                  <img
+                                                    loading="lazy"
+                                                    className="w-full h-40 object-cover rounded"
+                                                    src={file.preview}
+                                                    alt={file.name}
                                                   />
+                                                  <span className="text-sm text-gray-600">
+                                                    {file.name}
+                                                  </span>
+                                                  <div className="w-full flex space-x-2">
+                                                    <span className="text-sm text-gray-600">
+                                                      {progress}%
+                                                    </span>
+                                                    <Progress
+                                                      value={progress}
+                                                      max={100}
+                                                      className="h-2 self-center"
+                                                    />
+                                                  </div>
                                                 </div>
                                               </div>
                                             </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
+                                )}
+                              </div>
+                            </AccordionContent>
                           </div>
                         </AccordionItem>
                       </Accordion>
