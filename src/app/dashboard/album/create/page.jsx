@@ -75,6 +75,8 @@ const CompressionToast = () => (
 
 export default function CreateAlbumPage() {
   const { toast, dismiss } = useToast();
+  const compressionToastId = useRef(null);
+
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -84,7 +86,7 @@ export default function CreateAlbumPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [compressLoader, setCompressLoader] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
-  const compressionToastId = useRef(null);
+  const [totalProgress, setTotalProgress] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -223,10 +225,21 @@ export default function CreateAlbumPage() {
     });
   };
 
+  const getTotalFiles = () => {
+    return categories.reduce(
+      (total, category) => total + category.files.length,
+      0
+    );
+  };
+
   const handleUpload = async (values) => {
     setIsUploading(true);
+    setTotalProgress(0);
     const albumPin = generateCode();
     const uploadResponses = [];
+
+    const totalFiles = getTotalFiles();
+    let filesUploaded = 0;
 
     try {
       for (const category of categories) {
@@ -257,12 +270,25 @@ export default function CreateAlbumPage() {
 
             uploadResponses.push(response);
 
-            const progress = ((fileIndex + 1) / category.files.length) * 100;
+            filesUploaded++;
+            const totalProgressPercent = (filesUploaded / totalFiles) * 100;
+            setTotalProgress(totalProgressPercent);
+
+            // const progress = ((fileIndex + 1) / category.files.length) * 100;
+            // toast({
+            //   title: `Uploading ${category.name}`,
+            //   description: `${fileIndex + 1} of ${
+            //     category.files.length
+            //   } images uploaded (${Math.round(progress)}%)`,
+            //   duration: Infinity,
+            // });
+            const categoryProgress =
+              ((fileIndex + 1) / category.files.length) * 100;
             toast({
               title: `Uploading ${category.name}`,
               description: `${fileIndex + 1} of ${
                 category.files.length
-              } images uploaded (${Math.round(progress)}%)`,
+              } images uploaded (${Math.round(categoryProgress)}%)`,
               duration: 2000,
             });
           } catch (error) {
@@ -530,7 +556,21 @@ export default function CreateAlbumPage() {
                       />
                     </div>
                   </div>
-
+                  <div className={`${isUploading ? "block" : "hidden"}`}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium">
+                        Total Progress ({Math.round(totalProgress)}%)
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {getTotalFiles()} images total
+                      </span>
+                    </div>
+                    <Progress
+                      value={totalProgress}
+                      max={100}
+                      className="h-2 w-full bg-gray-200"
+                    />
+                  </div>
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-medium">Upload Album Images</h3>
