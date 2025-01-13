@@ -35,7 +35,10 @@ import {
 } from "@/components/ui/accordion";
 import AlbumDetailsCard from "@/components/AlbumDetailsCard";
 import { Checkbox } from "@/components/ui/checkbox";
+import LazyLoad from "react-lazyload";
 import { Progress } from "@/components/ui/progress";
+import { LazyLoadImage } from "react-lazy-load-image-component";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object({
   studioName: z.string().min(2, {
@@ -63,6 +66,17 @@ const formSchema = z.object({
   singleSided: z.boolean().default(false),
 });
 
+const CHUNK_SIZE = 80; // Process 50 images at a time
+const MEMORY_THRESHOLD = 500 * 1024 * 1024; // 500MB memory threshold
+const MAX_CONCURRENT_COMPRESSIONS = 10;
+
+const getMemoryUsage = () => {
+  if (performance && performance.memory) {
+    return performance.memory.usedJSHeapSize;
+  }
+  return 0;
+};
+
 const CompressionToast = () => (
   <div className="flex items-center space-x-2">
     <Loader2 className="h-4 w-4 animate-spin" />
@@ -75,7 +89,6 @@ const CompressionToast = () => (
 
 export default function CreateAlbumPage() {
   const { toast, dismiss } = useToast();
-  const compressionToastId = useRef(null);
 
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -87,6 +100,13 @@ export default function CreateAlbumPage() {
   const [compressLoader, setCompressLoader] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [totalProgress, setTotalProgress] = useState(0);
+  const compressionToastId = useRef(null);
+  const [progressState, setProgressState] = useState({
+    phase: "", // 'compression' or 'upload'
+    current: 0,
+    total: 0,
+    percentComplete: 0,
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -120,6 +140,19 @@ export default function CreateAlbumPage() {
     return id;
   };
 
+  const updateProgress = (phase, current, total) => {
+    // Compression is 50% of total progress, uploading is the other 50%
+    const baseProgress = phase === "compression" ? 0 : 50;
+    const percentComplete = baseProgress + (current / total) * 50;
+
+    setProgressState({
+      phase,
+      current,
+      total,
+      percentComplete,
+    });
+  };
+
   const compressImage = async (file, quality = 0.2, convertSize = 5000000) => {
     if (!(file instanceof File || file instanceof Blob)) {
       return file;
@@ -134,7 +167,14 @@ export default function CreateAlbumPage() {
         quality,
         convertSize,
         success(result) {
-          resolve(result);
+          // Create a temporary URL for preview
+          const preview = URL.createObjectURL(result);
+          resolve({
+            file: result,
+            preview,
+            name: file.name,
+            size: result.size,
+          });
         },
         error(err) {
           reject(err);
@@ -142,32 +182,117 @@ export default function CreateAlbumPage() {
       });
     });
   };
+  const processImageBatch = async (
+    files,
+    updateProgress,
+    batchIndex,
+    totalBatches,
+    updatePreview
+  ) => {
+    const compressPromises = [];
+    let currentConcurrent = 0;
+    const results = [];
 
-  const handleFileUpload = async (files, categoryIndex) => {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Wait if we've hit the concurrent limit or memory threshold
+      while (
+        currentConcurrent >= MAX_CONCURRENT_COMPRESSIONS ||
+        getMemoryUsage() > MEMORY_THRESHOLD
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      currentConcurrent++;
+      const compressionPromise = compressImage(file)
+        .then((result) => {
+          results.push(result);
+          currentConcurrent--;
+
+          updateProgress(
+            ((batchIndex * CHUNK_SIZE + results.length) /
+              (totalBatches * CHUNK_SIZE)) *
+              100
+          );
+
+          updatePreview(result);
+
+          return result;
+        })
+        .catch((error) => {
+          currentConcurrent--;
+          console.error(`Error compressing ${file.name}:`, error);
+          return null;
+        });
+
+      compressPromises.push(compressionPromise);
+    }
+
+    return (await Promise.all(compressPromises)).filter(
+      (result) => result !== null
+    );
+  };
+
+  const handleFileUpload = async (
+    files,
+    categoryIndex,
+    setCategories,
+    showCompressionToast,
+    dismiss,
+    toast
+  ) => {
     setCompressLoader(true);
     const toastId = showCompressionToast();
+    const fileArray = Array.from(files);
+    const totalBatches = Math.ceil(fileArray.length / CHUNK_SIZE);
+    const totalFiles = fileArray.length;
+    let processedFiles = 0;
 
     try {
-      const updatedCategories = [...categories];
-      const category = updatedCategories[categoryIndex];
+      for (let i = 0; i < totalBatches; i++) {
+        const batch = fileArray.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
 
-      const compressedFiles = await Promise.all(
-        Array.from(files).map(async (file) => {
-          if (!(file instanceof File || file instanceof Blob)) {
-            throw new Error("Invalid file input for compression.");
-          }
-          const compressedFile = await compressImage(file);
-          return {
-            file: compressedFile,
-            preview: URL.createObjectURL(compressedFile),
-            name: file.name,
-          };
-        })
-      );
+        const updatePreview = (compressedFile) => {
+          processedFiles++;
+          updateProgress("compression", processedFiles, totalFiles);
+          setCategories((prevCategories) => {
+            const updatedCategories = [...prevCategories];
+            const category = updatedCategories[categoryIndex];
+            category.files = [...category.files, compressedFile];
+            return updatedCategories;
+          });
+        };
 
-      category.files = [...category.files, ...compressedFiles];
-      setCategories(updatedCategories);
+        await processImageBatch(
+          batch,
+          (progress) => {
+            toast({
+              title: "Processing Images",
+              description: `Processing batch ${
+                i + 1
+              }/${totalBatches} (${Math.round(progress)}%)`,
+              duration: Infinity,
+            });
+          },
+          i,
+          totalBatches,
+          updatePreview 
+        );
+
+        if (window.gc) {
+          window.gc();
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
       dismiss(toastId);
+      toast({
+        title: "Image Processing Complete",
+        description: `Successfully processed ${fileArray.length} images`,
+        duration: 3000,
+      });
     } catch (error) {
       dismiss(toastId);
       toast({
@@ -237,68 +362,88 @@ export default function CreateAlbumPage() {
     setTotalProgress(0);
     const albumPin = generateCode();
     const uploadResponses = [];
+    const UPLOAD_CHUNK_SIZE = 20; 
+    const uploadToastId = toast({
+      title: "Starting Upload",
+      description: "Preparing files...",
+      duration: Infinity,
+    });
 
+    let totalFilesProcessed = 0;
     const totalFiles = getTotalFiles();
-    let filesUploaded = 0;
 
     try {
       for (const category of categories) {
-        for (
-          let fileIndex = 0;
-          fileIndex < category.files.length;
-          fileIndex++
-        ) {
-          const fileObj = category.files[fileIndex];
+        const totalChunks = Math.ceil(
+          category.files.length / UPLOAD_CHUNK_SIZE
+        );
 
-          try {
-            // Compress single image
-            const compressedFile = await compressImage(
-              fileObj.file,
-              0.4,
-              5000000
-            );
-            compressedFile.name = fileObj.name;
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          const startIndex = chunkIndex * UPLOAD_CHUNK_SIZE;
+          const endIndex = Math.min(
+            (chunkIndex + 1) * UPLOAD_CHUNK_SIZE,
+            category.files.length
+          );
+          const chunk = category.files.slice(startIndex, endIndex);
 
-            // Upload single image
-            const response = await uploadSingleImage(
-              compressedFile,
-              albumPin,
-              category.name,
-              fileObj.name,
-              fileIndex
-            );
+          toast({
+            id: uploadToastId,
+            title: `Uploading ${category.name}`,
+            description: `Processing chunk ${chunkIndex + 1} of ${totalChunks}`,
+            duration: Infinity,
+          });
 
-            uploadResponses.push(response);
+          const chunkPromises = chunk.map(async (fileObj, index) => {
+            try {
+              const compressedFile = await compressImage(
+                fileObj.file,
+                0.4,
+                5000000
+              );
+              compressedFile.name = fileObj.name;
+              totalFilesProcessed++;
+              updateProgress("upload", totalFilesProcessed, totalFiles);
+              // Upload the compressed file
+              return await uploadSingleImage(
+                compressedFile,
+                albumPin,
+                category.name,
+                fileObj.name,
+                startIndex + index
+              );
+            } catch (error) {
+              console.error(`Error processing ${fileObj.name}:`, error);
+              toast({
+                title: `Failed to process ${fileObj.name}`,
+                description: error.message,
+                variant: "destructive",
+              });
+              return null;
+            }
+          });
 
-            filesUploaded++;
-            const totalProgressPercent = (filesUploaded / totalFiles) * 100;
-            setTotalProgress(totalProgressPercent);
+          const chunkResults = await Promise.all(chunkPromises);
+          const validResults = chunkResults.filter((result) => result !== null);
+          uploadResponses.push(...validResults);
 
-            // const progress = ((fileIndex + 1) / category.files.length) * 100;
-            // toast({
-            //   title: `Uploading ${category.name}`,
-            //   description: `${fileIndex + 1} of ${
-            //     category.files.length
-            //   } images uploaded (${Math.round(progress)}%)`,
-            //   duration: Infinity,
-            // });
-            // const categoryProgress =
-            //   ((fileIndex + 1) / category.files.length) * 100;
-            // toast({
-            //   title: `Uploading ${category.name}`,
-            //   description: `${fileIndex + 1} of ${
-            //     category.files.length
-            //   } images uploaded (${Math.round(categoryProgress)}%)`,
-            //   duration: 2000,
-            // });
-          } catch (error) {
-            console.error(`Error uploading ${fileObj.name}:`, error);
-            toast({
-              title: `Failed to upload ${fileObj.name}`,
-              description: error.message,
-              variant: "destructive",
-            });
+          totalFilesProcessed += chunk.length;
+          const totalProgressPercent = (totalFilesProcessed / totalFiles) * 100;
+          setTotalProgress(totalProgressPercent);
+
+          toast({
+            id: uploadToastId,
+            title: `Uploading Files`,
+            description: `${totalFilesProcessed} of ${totalFiles} files processed (${Math.round(
+              totalProgressPercent
+            )}%)`,
+            duration: Infinity,
+          });
+
+          if (window.gc) {
+            window.gc();
           }
+
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
@@ -340,9 +485,16 @@ export default function CreateAlbumPage() {
       const createData = await createResponse.json();
       setAlbum(createData.data);
       setIsDialogOpen(true);
-      toast({ title: "Album created successfully" });
+
+      dismiss(uploadToastId);
+      toast({
+        title: "Album created successfully",
+        description: `Processed ${totalFilesProcessed} files`,
+        duration: 5000,
+      });
     } catch (error) {
       console.error("Album creation error:", error);
+      dismiss(uploadToastId);
       toast({
         title: "Failed to create album",
         description: error.message,
@@ -350,6 +502,14 @@ export default function CreateAlbumPage() {
       });
     } finally {
       setIsUploading(false);
+
+      categories.forEach((category) => {
+        category.files.forEach((fileObj) => {
+          if (fileObj.preview) {
+            URL.revokeObjectURL(fileObj.preview);
+          }
+        });
+      });
     }
   };
 
@@ -556,17 +716,24 @@ export default function CreateAlbumPage() {
                       />
                     </div>
                   </div>
-                  <div className={`${isUploading ? "block" : "hidden"}`}>
+                  <div
+                    className={`${
+                      isUploading || compressLoader ? "block" : "hidden"
+                    }`}
+                  >
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium">
-                        Total Progress ({Math.round(totalProgress)}%)
+                        {progressState.phase === "compression"
+                          ? "Compressing"
+                          : "Uploading"}{" "}
+                        - {Math.round(progressState.percentComplete)}%
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        {getTotalFiles()} images total
+                        {progressState.current} / {progressState.total} images
                       </span>
                     </div>
                     <Progress
-                      value={totalProgress}
+                      value={progressState.percentComplete}
                       max={100}
                       className="h-2 w-full bg-gray-200"
                     />
@@ -605,7 +772,14 @@ export default function CreateAlbumPage() {
                               <div className="grid gap-4">
                                 <FileUpload
                                   onChange={(files) =>
-                                    handleFileUpload(files, categoryIndex)
+                                    handleFileUpload(
+                                      files,
+                                      categoryIndex,
+                                      setCategories,
+                                      showCompressionToast,
+                                      dismiss,
+                                      toast
+                                    )
                                   }
                                   accept="image/*"
                                   multiple
@@ -630,12 +804,15 @@ export default function CreateAlbumPage() {
                                             <div className="space-y-2">
                                               <div className="flex justify-between items-center">
                                                 <div className="flex flex-col items-center w-full">
-                                                  <img
-                                                    loading="lazy"
-                                                    className="w-full h-40 object-cover rounded"
+                                                  <LazyLoadImage
                                                     src={file.preview}
                                                     alt={file.name}
+                                                    className="w-full h-40 object-cover rounded"
+                                                    placeholder={
+                                                      <div className="w-full h-40 rounded bg-gray-200 animate-pulse"></div>
+                                                    }
                                                   />
+
                                                   <span className="text-sm text-gray-600">
                                                     {file.name}
                                                   </span>
