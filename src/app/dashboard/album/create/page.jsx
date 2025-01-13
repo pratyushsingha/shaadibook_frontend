@@ -282,15 +282,15 @@ export default function CreateAlbumPage() {
             //   } images uploaded (${Math.round(progress)}%)`,
             //   duration: Infinity,
             // });
-            const categoryProgress =
-              ((fileIndex + 1) / category.files.length) * 100;
-            toast({
-              title: `Uploading ${category.name}`,
-              description: `${fileIndex + 1} of ${
-                category.files.length
-              } images uploaded (${Math.round(categoryProgress)}%)`,
-              duration: 2000,
-            });
+            // const categoryProgress =
+            //   ((fileIndex + 1) / category.files.length) * 100;
+            // toast({
+            //   title: `Uploading ${category.name}`,
+            //   description: `${fileIndex + 1} of ${
+            //     category.files.length
+            //   } images uploaded (${Math.round(categoryProgress)}%)`,
+            //   duration: 2000,
+            // });
           } catch (error) {
             console.error(`Error uploading ${fileObj.name}:`, error);
             toast({
