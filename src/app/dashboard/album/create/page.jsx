@@ -306,21 +306,19 @@ export default function CreateAlbumPage() {
     }
   };
 
-  const uploadSingleImage = async (
-    file,
-    albumPin,
-    category,
-    fileName,
-    fileIndex
-  ) => {
+  const uploadSingleImage = async (file, albumPin, category, fileName, fileIndex) => {
+    // Check if we're dealing with a compressed file object from earlier processing
+    const actualFile = file.file || file;
     const fileId = `${category}-${fileName}-${fileIndex}`;
+    
+    // Create FormData and append the actual file
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("image", actualFile);
     formData.append("albumPin", albumPin);
-
+  
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-
+  
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded * 100) / event.total);
@@ -330,7 +328,7 @@ export default function CreateAlbumPage() {
           }));
         }
       });
-
+  
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           setUploadProgress((prev) => ({
@@ -342,13 +340,13 @@ export default function CreateAlbumPage() {
           reject(new Error(`Upload failed with status ${xhr.status}`));
         }
       };
-
+  
       xhr.onerror = () => reject(new Error("Upload failed"));
-
+  
       xhr.open("POST", `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`);
       xhr.send(formData);
     });
-  };
+  };  
 
   const getTotalFiles = () => {
     return categories.reduce(
