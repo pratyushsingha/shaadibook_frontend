@@ -141,26 +141,6 @@ export default function CreateAlbumPage() {
     });
   };
 
-  const throttle = async (tasks, limit) => {
-    const results = [];
-    const executing = [];
-
-    for (const task of tasks) {
-      const promise = Promise.resolve().then(() => task());
-      results.push(promise);
-      executing.push(promise);
-
-      if (executing.length >= limit) {
-        await Promise.race(executing).then(() => {
-          const index = executing.findIndex((p) => p === promise);
-          if (index >= 0) executing.splice(index, 1);
-        });
-      }
-    }
-
-    return Promise.all(results);
-  };
-
   const handleFileUpload = async (files, categoryIndex) => {
     setCompressLoader(true);
     const toastId = showCompressionToast();
@@ -169,25 +149,22 @@ export default function CreateAlbumPage() {
       const updatedCategories = [...categories];
       const category = updatedCategories[categoryIndex];
 
-      // Create a task for each file compression
-      const compressionTasks = Array.from(files).map((file) => async () => {
-        if (!(file instanceof File || file instanceof Blob)) {
-          throw new Error("Invalid file input for compression.");
-        }
-        const compressedFile = await compressImage(file);
-        return {
-          file: compressedFile,
-          preview: URL.createObjectURL(compressedFile),
-          name: file.name,
-        };
-      });
-
-      // Throttle the tasks to process a limited number at a time (e.g., 5)
-      const compressedFiles = await throttle(compressionTasks, 5);
+      const compressedFiles = await Promise.all(
+        Array.from(files).map(async (file) => {
+          if (!(file instanceof File || file instanceof Blob)) {
+            throw new Error("Invalid file input for compression.");
+          }
+          const compressedFile = await compressImage(file);
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
+            name: file.name,
+          };
+        })
+      );
 
       category.files = [...category.files, ...compressedFiles];
       setCategories(updatedCategories);
-
       dismiss(toastId);
     } catch (error) {
       dismiss(toastId);
@@ -202,109 +179,96 @@ export default function CreateAlbumPage() {
     }
   };
 
-  const handleRemoveImage = (categoryIndex, fileIndex) => {
-    const updatedCategories = [...categories];
-    const category = updatedCategories[categoryIndex];
+  const uploadSingleImage = async (
+    file,
+    albumPin,
+    category,
+    fileName,
+    fileIndex
+  ) => {
+    const fileId = `${category}-${fileName}-${fileIndex}`;
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("albumPin", albumPin);
 
-    URL.revokeObjectURL(category.files[fileIndex].preview);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
 
-    category.files.splice(fileIndex, 1);
-    setCategories(updatedCategories);
-  };
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded * 100) / event.total);
+          setUploadProgress((prev) => ({
+            ...prev,
+            [fileId]: progress,
+          }));
+        }
+      });
 
-  const handleAddCategory = () => {
-    const newCategoryName = prompt("Enter category name:");
-    if (newCategoryName) {
-      setCategories((prevCategories) => [
-        { name: newCategoryName, files: [], uploaded: false },
-        ...prevCategories,
-      ]);
-    }
-  };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgress((prev) => ({
+            ...prev,
+            [fileId]: 100,
+          }));
+          resolve(JSON.parse(xhr.response));
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
 
-  const generateCode = () => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    return `${timestamp}`;
+      xhr.onerror = () => reject(new Error("Upload failed"));
+
+      xhr.open("POST", `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`);
+      xhr.send(formData);
+    });
   };
 
   const handleUpload = async (values) => {
     setIsUploading(true);
     const albumPin = generateCode();
+    const uploadResponses = [];
 
     try {
-      const compressedFilesByCategory = await Promise.all(
-        categories.map(async (category) => ({
-          category: category.name,
-          files: await Promise.all(
-            category.files.map(async (fileObj) => {
-              const compressedFile = await compressImage(
-                fileObj.file,
-                0.4,
-                5000000
-              );
-              compressedFile.name = fileObj.name;
-              return compressedFile;
-            })
-          ),
-        }))
-      );
-
-      const uploadResponses = [];
-
-      for (const { category, files } of compressedFilesByCategory) {
-        for (const [index, file] of files.entries()) {
-          const formData = new FormData();
-          formData.append("image", file);
-          formData.append("albumPin", albumPin);
-
-          const fileName = file.name || `file-${index}`;
-          const fileId = `${category}-${fileName}-${index}`;
+      for (const category of categories) {
+        for (
+          let fileIndex = 0;
+          fileIndex < category.files.length;
+          fileIndex++
+        ) {
+          const fileObj = category.files[fileIndex];
 
           try {
-            const xhr = new XMLHttpRequest();
-
-            const uploadPromise = new Promise((resolve, reject) => {
-              xhr.upload.addEventListener("progress", (event) => {
-                if (event.lengthComputable) {
-                  const progress = Math.round(
-                    (event.loaded * 100) / event.total
-                  );
-                  setUploadProgress((prev) => ({
-                    ...prev,
-                    [fileId]: progress,
-                  }));
-                }
-              });
-
-              xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  setUploadProgress((prev) => ({
-                    ...prev,
-                    [fileId]: 100,
-                  }));
-                  resolve(JSON.parse(xhr.response));
-                } else {
-                  reject(new Error(`Upload failed with status ${xhr.status}`));
-                }
-              };
-
-              xhr.onerror = () => {
-                reject(new Error("Upload failed"));
-              };
-            });
-
-            xhr.open(
-              "POST",
-              `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`
+            // Compress single image
+            const compressedFile = await compressImage(
+              fileObj.file,
+              0.4,
+              5000000
             );
-            xhr.send(formData);
+            compressedFile.name = fileObj.name;
 
-            const response = await uploadPromise;
+            // Upload single image
+            const response = await uploadSingleImage(
+              compressedFile,
+              albumPin,
+              category.name,
+              fileObj.name,
+              fileIndex
+            );
+
             uploadResponses.push(response);
-          } catch (error) {
-            console.error(`Error uploading ${fileName}:`, error);
+
+            const progress = ((fileIndex + 1) / category.files.length) * 100;
             toast({
-              title: `Failed to upload ${fileName}`,
+              title: `Uploading ${category.name}`,
+              description: `${fileIndex + 1} of ${
+                category.files.length
+              } images uploaded (${Math.round(progress)}%)`,
+              duration: 2000,
+            });
+          } catch (error) {
+            console.error(`Error uploading ${fileObj.name}:`, error);
+            toast({
+              title: `Failed to upload ${fileObj.name}`,
               description: error.message,
               variant: "destructive",
             });
@@ -363,6 +327,31 @@ export default function CreateAlbumPage() {
     }
   };
 
+  const handleRemoveImage = (categoryIndex, fileIndex) => {
+    const updatedCategories = [...categories];
+    const category = updatedCategories[categoryIndex];
+
+    URL.revokeObjectURL(category.files[fileIndex].preview);
+
+    category.files.splice(fileIndex, 1);
+    setCategories(updatedCategories);
+  };
+
+  const handleAddCategory = () => {
+    const newCategoryName = prompt("Enter category name:");
+    if (newCategoryName) {
+      setCategories((prevCategories) => [
+        { name: newCategoryName, files: [], uploaded: false },
+        ...prevCategories,
+      ]);
+    }
+  };
+
+  const generateCode = () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    return `${timestamp}`;
+  };
+
   useEffect(() => {
     return () => {
       categories.forEach((category) => {
@@ -372,7 +361,6 @@ export default function CreateAlbumPage() {
       });
     };
   }, []);
-
   return (
     <>
       <main className="p-6">
