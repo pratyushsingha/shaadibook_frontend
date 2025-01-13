@@ -357,10 +357,16 @@ export default function CreateAlbumPage() {
     fileName,
     fileIndex
   ) => {
-    const actualFile = file.file || file;
     const fileId = `${category}-${fileName}-${fileIndex}`;
 
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; 
+    // Skip if file was already uploaded successfully
+    if (uploadProgress[fileId] === 100) {
+      return null;
+    }
+
+    const actualFile = file.file || file;
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
     if (actualFile.size > MAX_FILE_SIZE) {
       throw new Error(
         `File ${fileName} is too large. Maximum size is ${
@@ -376,11 +382,13 @@ export default function CreateAlbumPage() {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
+      // Set timeout to 30 seconds
       xhr.timeout = 30000;
       xhr.ontimeout = () => {
         reject(new Error(`Upload timed out for ${fileName}`));
       };
 
+      // Track upload progress
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded * 100) / event.total);
@@ -391,6 +399,7 @@ export default function CreateAlbumPage() {
         }
       });
 
+      // Handle successful upload
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           setUploadProgress((prev) => ({
@@ -405,6 +414,7 @@ export default function CreateAlbumPage() {
         }
       };
 
+      // Handle network errors
       xhr.onerror = () => {
         reject(new Error(`Network error while uploading ${fileName}`));
       };
@@ -414,19 +424,14 @@ export default function CreateAlbumPage() {
     });
   };
 
-  const getTotalFiles = () => {
-    return categories.reduce(
-      (total, category) => total + category.files.length,
-      0
-    );
-  };
-
   const handleUpload = async (values) => {
     setIsUploading(true);
     setTotalProgress(0);
     const albumPin = generateCode();
     const uploadResponses = [];
     const UPLOAD_CHUNK_SIZE = 5;
+
+    // Show initial toast
     const uploadToastId = toast({
       title: "Starting Upload",
       description: "Preparing files...",
@@ -437,11 +442,13 @@ export default function CreateAlbumPage() {
     const totalFiles = getTotalFiles();
 
     try {
+      // Process each category
       for (const category of categories) {
         const totalChunks = Math.ceil(
           category.files.length / UPLOAD_CHUNK_SIZE
         );
 
+        // Process files in chunks to avoid memory issues
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
           const startIndex = chunkIndex * UPLOAD_CHUNK_SIZE;
           const endIndex = Math.min(
@@ -450,6 +457,7 @@ export default function CreateAlbumPage() {
           );
           const chunk = category.files.slice(startIndex, endIndex);
 
+          // Update toast with current chunk progress
           toast({
             id: uploadToastId,
             title: `Uploading ${category.name}`,
@@ -457,24 +465,31 @@ export default function CreateAlbumPage() {
             duration: Infinity,
           });
 
+          // Process each file in the chunk
           const chunkPromises = chunk.map(async (fileObj, index) => {
             try {
-              const compressedFile = await compressImage(
-                fileObj.file,
-                0.4,
-                5000000
-              );
-              compressedFile.name = fileObj.name;
+              // Only compress if not already compressed
+              let processedFile;
+              if (fileObj.file instanceof Blob) {
+                processedFile = fileObj;
+              } else {
+                processedFile = await compressImage(fileObj.file, 0.4, 5000000);
+                processedFile.name = fileObj.name;
+              }
+
               totalFilesProcessed++;
               updateProgress("upload", totalFilesProcessed, totalFiles);
-              // Upload the compressed file
-              return await uploadSingleImage(
-                compressedFile,
+
+              // Attempt upload
+              const response = await uploadSingleImage(
+                processedFile,
                 albumPin,
                 category.name,
                 fileObj.name,
                 startIndex + index
               );
+
+              return response;
             } catch (error) {
               console.error(`Error processing ${fileObj.name}:`, error);
               toast({
@@ -486,14 +501,16 @@ export default function CreateAlbumPage() {
             }
           });
 
+          // Wait for all files in chunk to complete
           const chunkResults = await Promise.all(chunkPromises);
           const validResults = chunkResults.filter((result) => result !== null);
           uploadResponses.push(...validResults);
 
-          totalFilesProcessed += chunk.length;
+          // Update progress
           const totalProgressPercent = (totalFilesProcessed / totalFiles) * 100;
           setTotalProgress(totalProgressPercent);
 
+          // Update toast with overall progress
           toast({
             id: uploadToastId,
             title: `Uploading Files`,
@@ -503,14 +520,17 @@ export default function CreateAlbumPage() {
             duration: Infinity,
           });
 
+          // Garbage collection if available
           if (window.gc) {
             window.gc();
           }
 
+          // Small delay between chunks
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
+      // Prepare album data
       const categoryImages = categories.map((category) => ({
         category: category.name,
         images: category.files.map((fileObj) => ({
@@ -519,6 +539,7 @@ export default function CreateAlbumPage() {
         })),
       }));
 
+      // Create album payload
       const albumPayload = {
         name: title,
         contactPerson: [values.contactPerson1, values.contactPerson2],
@@ -530,6 +551,7 @@ export default function CreateAlbumPage() {
         action: "E_ALBUM",
       };
 
+      // Create album
       const createResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/create`,
         {
@@ -546,10 +568,12 @@ export default function CreateAlbumPage() {
         throw new Error("Failed to create album");
       }
 
+      // Handle successful creation
       const createData = await createResponse.json();
       setAlbum(createData.data);
       setIsDialogOpen(true);
 
+      // Show success toast
       dismiss(uploadToastId);
       toast({
         title: "Album created successfully",
@@ -567,6 +591,7 @@ export default function CreateAlbumPage() {
     } finally {
       setIsUploading(false);
 
+      // Cleanup: revoke object URLs
       categories.forEach((category) => {
         category.files.forEach((fileObj) => {
           if (fileObj.preview) {
@@ -575,6 +600,13 @@ export default function CreateAlbumPage() {
         });
       });
     }
+  };
+
+  const getTotalFiles = () => {
+    return categories.reduce(
+      (total, category) => total + category.files.length,
+      0
+    );
   };
 
   const handleRemoveImage = (categoryIndex, fileIndex) => {
