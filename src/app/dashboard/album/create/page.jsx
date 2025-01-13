@@ -141,6 +141,26 @@ export default function CreateAlbumPage() {
     });
   };
 
+  const throttle = async (tasks, limit) => {
+    const results = [];
+    const executing = [];
+
+    for (const task of tasks) {
+      const promise = Promise.resolve().then(() => task());
+      results.push(promise);
+      executing.push(promise);
+
+      if (executing.length >= limit) {
+        await Promise.race(executing).then(() => {
+          const index = executing.findIndex((p) => p === promise);
+          if (index >= 0) executing.splice(index, 1);
+        });
+      }
+    }
+
+    return Promise.all(results);
+  };
+
   const handleFileUpload = async (files, categoryIndex) => {
     setCompressLoader(true);
     const toastId = showCompressionToast();
@@ -149,19 +169,21 @@ export default function CreateAlbumPage() {
       const updatedCategories = [...categories];
       const category = updatedCategories[categoryIndex];
 
-      const compressedFiles = await Promise.all(
-        Array.from(files).map(async (file) => {
-          if (!(file instanceof File || file instanceof Blob)) {
-            throw new Error("Invalid file input for compression.");
-          }
-          const compressedFile = await compressImage(file);
-          return {
-            file: compressedFile,
-            preview: URL.createObjectURL(compressedFile),
-            name: file.name,
-          };
-        })
-      );
+      // Create a task for each file compression
+      const compressionTasks = Array.from(files).map((file) => async () => {
+        if (!(file instanceof File || file instanceof Blob)) {
+          throw new Error("Invalid file input for compression.");
+        }
+        const compressedFile = await compressImage(file);
+        return {
+          file: compressedFile,
+          preview: URL.createObjectURL(compressedFile),
+          name: file.name,
+        };
+      });
+
+      // Throttle the tasks to process a limited number at a time (e.g., 5)
+      const compressedFiles = await throttle(compressionTasks, 5);
 
       category.files = [...category.files, ...compressedFiles];
       setCategories(updatedCategories);
