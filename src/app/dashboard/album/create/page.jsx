@@ -36,7 +36,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 2;
 
 const formSchema = z.object({
   studioName: z
