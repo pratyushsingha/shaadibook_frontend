@@ -39,6 +39,7 @@ import LazyLoad from "react-lazyload";
 import { Progress } from "@/components/ui/progress";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import { Skeleton } from "@/components/ui/skeleton";
+import Image from "next/image";
 
 const formSchema = z.object({
   studioName: z.string().min(2, {
@@ -102,7 +103,7 @@ export default function CreateAlbumPage() {
   const [totalProgress, setTotalProgress] = useState(0);
   const compressionToastId = useRef(null);
   const [progressState, setProgressState] = useState({
-    phase: "", // 'compression' or 'upload'
+    phase: "",
     current: 0,
     total: 0,
     percentComplete: 0,
@@ -243,66 +244,51 @@ export default function CreateAlbumPage() {
     toast
   ) => {
     setCompressLoader(true);
-    const toastId = showCompressionToast();
     const fileArray = Array.from(files);
-    const totalBatches = Math.ceil(fileArray.length / CHUNK_SIZE);
-    const totalFiles = fileArray.length;
-    let processedFiles = 0;
 
     try {
-      for (let i = 0; i < totalBatches; i++) {
-        const batch = fileArray.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      setCategories((prevCategories) => {
+        const updatedCategories = [...prevCategories];
+        const category = updatedCategories[categoryIndex];
 
-        const updatePreview = (compressedFile) => {
-          processedFiles++;
-          updateProgress("compression", processedFiles, totalFiles);
-          setCategories((prevCategories) => {
-            const updatedCategories = [...prevCategories];
-            const category = updatedCategories[categoryIndex];
-            category.files = [...category.files, compressedFile];
-            return updatedCategories;
-          });
-        };
+        // Map new files to the required format
+        const newFiles = fileArray.map((file) => ({
+          file: file,
+          name: file.name,
+          size: file.size,
+          preview: URL.createObjectURL(file),
+        }));
 
-        await processImageBatch(
-          batch,
-          (progress) => {
-            toast({
-              title: "Processing Images",
-              description: `Processing batch ${
-                i + 1
-              }/${totalBatches} (${Math.round(progress)}%)`,
-              duration: Infinity,
-            });
-          },
-          i,
-          totalBatches,
-          updatePreview
-        );
+        // Deduplicate based on file name and size
+        const deduplicatedFiles = [
+          ...category.files,
+          ...newFiles.filter(
+            (newFile) =>
+              !category.files.some(
+                (existingFile) =>
+                  existingFile.name === newFile.name &&
+                  existingFile.size === newFile.size
+              )
+          ),
+        ];
 
-        if (window.gc) {
-          window.gc();
-        }
+        category.files = deduplicatedFiles;
+        return updatedCategories;
+      });
 
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-
-      dismiss(toastId);
       toast({
-        title: "Image Processing Complete",
-        description: `Successfully processed ${fileArray.length} images`,
+        title: "Files Added",
+        description: `Successfully added ${fileArray.length} files`,
         duration: 3000,
       });
     } catch (error) {
-      dismiss(toastId);
       toast({
-        title: "Error processing images",
+        title: "Error adding files",
         description: error.message,
         variant: "destructive",
       });
     } finally {
       setCompressLoader(false);
-      compressionToastId.current = null;
     }
   };
 
@@ -364,19 +350,8 @@ export default function CreateAlbumPage() {
       return null;
     }
 
-    const actualFile = file.file || file;
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-    if (actualFile.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File ${fileName} is too large. Maximum size is ${
-          MAX_FILE_SIZE / (1024 * 1024)
-        }MB`
-      );
-    }
-
     const formData = new FormData();
-    formData.append("image", actualFile);
+    formData.append("image", file.file);
     formData.append("albumPin", albumPin);
 
     return new Promise((resolve, reject) => {
@@ -900,15 +875,16 @@ export default function CreateAlbumPage() {
                                             <div className="space-y-2">
                                               <div className="flex justify-between items-center">
                                                 <div className="flex flex-col items-center w-full">
-                                                  <LazyLoadImage
+                                                  <Image
                                                     src={file.preview}
                                                     alt={file.name}
-                                                    className="w-full h-40 object-cover rounded"
-                                                    placeholder={
-                                                      <div className="w-full h-40 rounded bg-gray-200 animate-pulse"></div>
-                                                    }
+                                                    layout="fixed"
+                                                    width={128} // Width in pixels
+                                                    height={128} // Height in pixels
+                                                    className="rounded"
+                                                    placeholder="blur"
+                                                    blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZ2F5IiAvPg=="
                                                   />
-
                                                   <span className="text-sm text-gray-600">
                                                     {file.name}
                                                   </span>
