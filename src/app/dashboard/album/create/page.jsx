@@ -219,14 +219,19 @@ export default function CreateAlbumPage() {
   }, []);
 
   const handleAddCategory = () => {
-    if (newCategoryName.trim() !== "") {
-      setCategories([
-        ...categories,
-        { name: newCategoryName.trim(), files: [], uploaded: false, uploadedUrls: [] },
+    const categoryName = prompt("Please enter a category name:");
+    if (categoryName) {
+      setCategories((prevCategories) => [
+        {
+          name: categoryName.trim(),
+          files: [],
+          uploaded: false,
+          uploadedUrls: [],
+        },
+        ...prevCategories, // Prepend the new category
       ]);
-      setNewCategoryName("");
     } else {
-      alert("Please provide a valid category name.");
+      alert("Category name cannot be empty. Please try again.");
     }
   };
 
@@ -730,7 +735,7 @@ export default function CreateAlbumPage() {
                                                       className="w-full h-40 object-cover rounded"
                                                     />
                                                   ) : (
-                                                    "loading.."
+                                                    <div className="w-full h-40 bg-gray-200 animate-pulse rounded"></div>
                                                   )}
 
                                                   <span className="text-sm text-gray-600">
@@ -762,13 +767,22 @@ export default function CreateAlbumPage() {
                                       Uploaded URLs
                                     </h3>
                                     <ul className="list-disc pl-5">
-                                      {category.uploadedUrls.map((url, index) => (
-                                        <li key={index} className="text-sm text-blue-600">
-                                          <a href={url} target="_blank" rel="noopener noreferrer">
-                                            {url}
-                                          </a>
-                                        </li>
-                                      ))}
+                                      {category.uploadedUrls.map(
+                                        (url, index) => (
+                                          <li
+                                            key={index}
+                                            className="text-sm text-blue-600"
+                                          >
+                                            <a
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                            >
+                                              {url}
+                                            </a>
+                                          </li>
+                                        )
+                                      )}
                                     </ul>
                                   </div>
                                 )}
