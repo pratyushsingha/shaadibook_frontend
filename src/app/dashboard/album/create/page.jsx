@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Search, Loader2, Mail, Plus, X } from "lucide-react";
@@ -36,7 +37,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
 
-const BATCH_SIZE = 2;
+const BATCH_SIZE = 8;
 
 const formSchema = z.object({
   studioName: z
