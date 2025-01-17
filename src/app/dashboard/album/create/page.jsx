@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Search, Loader2, Mail, Plus, X } from "lucide-react";
@@ -36,6 +35,7 @@ import {
 } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
+import useAuth from "@/store/useAuth";
 
 const BATCH_SIZE = 2;
 
@@ -73,113 +73,9 @@ const generateCode = () => {
   return result;
 };
 
-const BatchUploadUI = ({
-  category,
-  files,
-  uploadProgress,
-  onRemoveImage,
-  isUploading,
-}) => {
-  const getBatches = () => {
-    const batches = [];
-    for (let i = 0; i < files.length; i += BATCH_SIZE) {
-      batches.push(files.slice(i, i + BATCH_SIZE));
-    }
-    return batches;
-  };
-
-  const getProgressForFile = (file, batchIndex, fileIndex) => {
-    const fileId = `${category.name}-${file.name}-${
-      batchIndex * BATCH_SIZE + fileIndex
-    }`;
-    return uploadProgress[fileId] || 0;
-  };
-
-  return (
-    <div className="space-y-6">
-      {getBatches().map((batch, batchIndex) => (
-        <Card key={batchIndex} className="p-4">
-          <div className="mb-4 flex justify-between items-center">
-            <h4 className="font-medium text-sm">
-              Batch {batchIndex + 1} ({batch.length} images)
-            </h4>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
-                {Math.round(
-                  batch.reduce(
-                    (acc, file, i) =>
-                      acc + getProgressForFile(file, batchIndex, i),
-                    0
-                  ) / batch.length
-                )}
-                %
-              </span>
-              <Progress
-                value={
-                  batch.reduce(
-                    (acc, file, i) =>
-                      acc + getProgressForFile(file, batchIndex, i),
-                    0
-                  ) / batch.length
-                }
-                className="w-24 h-2"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {batch.map((file, fileIndex) => {
-              const progress = getProgressForFile(file, batchIndex, fileIndex);
-              const absoluteIndex = batchIndex * BATCH_SIZE + fileIndex;
-
-              return (
-                <div key={`${file.name}-${fileIndex}`} className="relative">
-                  <div className="aspect-square relative rounded-lg overflow-hidden border bg-gray-50">
-                    <img
-                      src={file.preview}
-                      alt={file.name}
-                      className="object-cover w-full h-full"
-                    />
-
-                    {isUploading && progress < 100 && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <div className="text-white text-sm font-medium">
-                          {progress}%
-                        </div>
-                      </div>
-                    )}
-
-                    {!isUploading && (
-                      <button
-                        onClick={() => onRemoveImage(absoluteIndex)}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="mt-1">
-                    <p
-                      className="text-xs text-gray-600 truncate"
-                      title={file.name}
-                    >
-                      {file.name}
-                    </p>
-                    <Progress value={progress} className="h-1 mt-1" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-};
-
 export default function CreateAlbumPage() {
   const { toast, dismiss } = useToast();
+  const { user } = useAuth();
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -205,7 +101,7 @@ export default function CreateAlbumPage() {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      studioName: "",
+      studioName: user?.studioName || "",
       contactPerson1: "",
       contactPerson2: "",
       emailIds: "",
@@ -229,7 +125,7 @@ export default function CreateAlbumPage() {
           uploaded: false,
           uploadedUrls: [],
         },
-        ...prevCategories, // Prepend the new category
+        ...prevCategories,
       ]);
     } else {
       alert("Category name cannot be empty. Please try again.");
@@ -273,7 +169,6 @@ export default function CreateAlbumPage() {
         updateProgress(fileId, 100);
       });
 
-      // Update the category with the new URLs
       setCategories((prevCategories) => {
         const updatedCategories = [...prevCategories];
         const categoryIndex = updatedCategories.findIndex(
@@ -488,21 +383,18 @@ export default function CreateAlbumPage() {
     <>
       <main className="p-6">
         <div className="mb-6 flex items-center justify-between">
-          <Button
-            className="bg-gradient-to-r from-[#7B2991] to-[#4F2D82] text-white py-3 px-4 rounded-lg text-lg hover:from-purple-end hover:to-purple-start transition duration-300"
-            asChild
-          >
-            <Link href="/dashboard">Back</Link>
-          </Button>
-          <div className="flex gap-2">
-            <Button
-              className="text-white py-3 px-4 rounded-lg hover:from-purple-end hover:to-purple-start transition duration-300"
-              variant="outline"
-            >
-              Copy And Share
-            </Button>
+          <div className="flex space-x-3">
             <Button
               className="bg-gradient-to-r from-[#7B2991] to-[#4F2D82] text-white py-3 px-4 rounded-lg text-lg hover:from-purple-end hover:to-purple-start transition duration-300"
+              asChild
+            >
+              <Link href="/dashboard">Back</Link>
+            </Button>
+            <p className="self-center">{title}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button>Copy And Share</Button>
+            <Button
               onClick={form.handleSubmit(handleUpload)}
               disabled={isUploading}
             >
@@ -549,7 +441,11 @@ export default function CreateAlbumPage() {
                         <FormItem>
                           <FormLabel>Studio Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter Studio Name" {...field} />
+                            <Input
+                              disabled
+                              placeholder="Enter Studio Name"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -799,13 +695,12 @@ export default function CreateAlbumPage() {
             </Form>
           </CardContent>
         </Card>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Album Created Successfully</DialogTitle>
-            </DialogHeader>
-            <AlbumDetailsCard album={album} />
-          </DialogContent>
+        <Dialog
+          className="w-10/12"
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+        >
+          <AlbumDetailsCard album={album} />
         </Dialog>
       </main>
     </>

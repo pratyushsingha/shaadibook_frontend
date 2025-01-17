@@ -10,16 +10,23 @@ const useAuth = create((set) => ({
   role: null,
   error: null,
   loading: false,
+  profileLoading: false,
 
   setLoadingState: (loading, error = null) => set({ loading, error }),
 
   login: async ({ email, password, rememberMe }) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.post(`${BASE_URL}/auth/login`, {
-        email,
-        password,
-      });
+      const response = await axios.post(
+        `${BASE_URL}/auth/login`,
+        {
+          email,
+          password,
+        },
+        {
+          withCredentials: true,
+        }
+      );
       const { token, username, role } = response.data.data;
 
       if (rememberMe) {
@@ -36,6 +43,8 @@ const useAuth = create((set) => ({
         error: null,
         loading: false,
       });
+      console.log(response.data.data);
+      return response.data.data;
     } catch (error) {
       set({
         error: error.response?.data?.message || "Login failed",
@@ -73,21 +82,19 @@ const useAuth = create((set) => ({
           withCredentials: true,
         }
       );
-      const { user } = response.data.data;
-      set({ user, error: null, loading: false });
-      return user;
+
+      set({ user: response.data.data, error: null, loading: false });
+      return response.data.data;
     } catch (err) {
-      if (err.response?.data?.message) {
-        const fieldErrors = err.response.data.message.reduce((acc, error) => {
-          acc[error.path] = error.msg;
-          return acc;
-        }, {});
-        console.log(fieldErrors);
-        set({
-          error: fieldErrors,
-          loading: false,
-        });
-      }
+      const fieldErrors = err.response?.data?.message?.reduce((acc, error) => {
+        acc[error.path] = error.msg;
+        return acc;
+      }, {}) || { error: err.message || "Signup failed" };
+
+      set({
+        error: fieldErrors,
+        loading: false,
+      });
     }
   },
 
@@ -97,7 +104,10 @@ const useAuth = create((set) => ({
       await axios.post(
         `${BASE_URL}/auth/logout`,
         {},
-        { withCredentials: true }
+
+        {
+          withCredentials: true,
+        }
       );
       localStorage.removeItem("token");
       set({
@@ -116,20 +126,70 @@ const useAuth = create((set) => ({
     }
   },
 
+  editProfile: async ({
+    name,
+    address,
+    phoneNo,
+    country,
+    city,
+    zipcode,
+    logo,
+    coverImage,
+    studioName,
+    about,
+  }) => {
+    set({ profileLoading: true, loading: false, error: null });
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/auth/edit-profile`,
+        {
+          name,
+          address,
+          phoneNo,
+          country,
+          city,
+          zipcode,
+          logo,
+          coverImage,
+          studioName,
+          about,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true,
+        }
+      );
+      set({
+        user: response.data.data.user,
+        error: null,
+        profileLoading: false,
+      });
+      return response.data.data.user;
+    } catch (error) {
+      set({
+        error: error.response?.data?.message || "Profile update failed",
+        profileLoading: false,
+      });
+    }
+  },
+
   initializeAuth: async () => {
+    set({ loading: true, error: null });
     const token = localStorage.getItem("token");
     if (token) {
       axios.defaults.headers["Authorization"] = `Bearer ${token}`;
       try {
-        const { data } = await axios.get(`${BASE_URL}/auth/me`);
+        const response = await axios.get(`${BASE_URL}/auth/current-user`);
+        console.log(response.data.data);
         set({
-          user: data.user,
-          role: data.role,
+          user: response.data.data,
+          role: response.data.data.role,
           isAuthenticated: true,
+          loading: false,
         });
       } catch (error) {
         console.error("Auth initialization failed", error);
-        set({ isAuthenticated: false });
+        set({ isAuthenticated: false, error: error.message });
       }
     }
   },

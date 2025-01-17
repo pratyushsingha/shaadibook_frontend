@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 
-// This function can be marked `async` if using `await` inside
+const protectedRoutes = ["/", "/dashboard/:path*"];
+
 export function middleware(request) {
-  return NextResponse.redirect(new URL("/home", request.url));
+  const refreshToken = request.cookies.get("refreshToken");
+
+  if (!refreshToken && protectedRoutes.includes(request.nextUrl.pathname)) {
+    const absoluteUrl = new URL("/login", request.nextUrl.origin);
+    return NextResponse.redirect(absoluteUrl.toString());
+  }
+  if (refreshToken && request.nextUrl.pathname === "/login") {
+    const absoluteUrl = new URL("/dashboard", request.nextUrl.origin);
+    return NextResponse.redirect(absoluteUrl.toString());
+  }
+  return NextResponse.next();
 }
 
-// See "Matching Paths" below to learn more
 export const config = {
-  matcher: "/about/:path*",
+  matcher: ["/", "/dashboard/:path*", "/login"],
 };

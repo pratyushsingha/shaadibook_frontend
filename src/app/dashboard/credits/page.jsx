@@ -19,7 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BuyCreditsModal from "../../../components/BuyCredits";
@@ -37,8 +43,8 @@ export default function CreditDetailsPage() {
                   <Button className="bg-purple-600 hover:bg-purple-700">
                     Buy eAlbum Credits
                   </Button>
-                  <BuyCreditsModal />
                 </DialogTrigger>
+                <BuyCreditsModal />
               </Dialog>
 
               <Button className="bg-purple-600 hover:bg-purple-700">

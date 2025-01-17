@@ -17,7 +17,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useAuth from "../../store/useAuth";
 import { useRouter } from "next/navigation";
 import { useToast } from "../../hooks/use-toast";
@@ -43,7 +43,7 @@ const signupSchema = z.object({
 const SignupForm = () => {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
-  const { signup, loading, error } = useAuth();
+  const { signup, loading, error, user } = useAuth();
   const router = useRouter();
 
   const form = useForm({
@@ -58,29 +58,49 @@ const SignupForm = () => {
       name: "",
     },
   });
-
   const onSubmit = async (data) => {
-    const result = await signup({
-      name: data.name,
-      username: data.username,
-      email: data.email,
-      password: data.password,
-      studioName: data.studioName,
-      phoneNo: data.phone,
-      address: data.address,
-      role: "STUDIO_ADMIN",
-    });
-    console.log(result);
-    if (result) {
-      toast({
-        title: "Registration Successful",
-        message: "Please login to continue",
+    try {
+      const result = await signup({
+        name: data.name,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        studioName: data.studioName,
+        phoneNo: data.phone,
+        address: data.address,
+        role: "STUDIO_ADMIN",
       });
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      if (result) {
+        toast({
+          title: `Hi ${data.username}`,
+          description: "Please login to continue",
+        });
+
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: err.message || "Something went wrong. Please try again.",
+        variant: "error",
+      });
     }
   };
+
+  useEffect(() => {
+    if (error) {
+      if (typeof error === "string") {
+        toast({ title: "Error", description: error });
+      } else {
+        Object.entries(error).forEach(([field, message]) => {
+          toast({ title: `Error in ${field}`, description: message });
+        });
+      }
+    }
+  }, [error, toast]);
 
   return (
     <div className="flex-1 flex items-center justify-center p-4">

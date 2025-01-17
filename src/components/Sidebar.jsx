@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import Link from "next/link"
-import { CreditCard, LayoutDashboard, LogOut, User } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Link from "next/link";
+import { CreditCard, LayoutDashboard, LogOut, User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
   SidebarContent,
@@ -10,64 +10,80 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+const sidebarItems = [
+  {
+    href: "/dashboard/",
+    icon: <LayoutDashboard className="h-4 w-4" />,
+    label: "Dashboard",
+    isActive: true,
+  },
+  {
+    href: "/dashboard/credits",
+    icon: <CreditCard className="h-4 w-4" />,
+    label: "Credit Details",
+  },
+  {
+    href: "/dashboard/profile",
+    icon: <User className="h-4 w-4" />,
+    label: "Profile",
+  },
+  {
+    href: "/dashboard/logout",
+    icon: <LogOut className="h-4 w-4" />,
+    label: "Sign Out",
+  },
+];
 
 export function DashboardSidebar({ user }) {
+  const pathname = usePathname();
   return (
     <Sidebar className="border-r">
       <SidebarHeader className="border-b p-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span className="text-xl text-purple-600">LOGO</span>
+          <Image width={50} height={50} src="/logo.png" />
+          <h3 className="text-purple-900 font-bold text-xl">SHAADI ALBUM</h3>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <div className="p-4">
           <div className="flex items-center gap-3 mb-8">
             <Avatar>
-              <AvatarImage src={user.image} alt={user.name} />
-              <AvatarFallback>{user.name[0]}</AvatarFallback>
+              <AvatarImage src={user?.logo} alt={user?.name} />
+              <AvatarFallback>{user?.name}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">{user.name}</p>
+              <p className="font-medium">{user?.name}</p>
             </div>
           </div>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive>
-                <Link href="/dashboard">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/dashboard/credits">
-                  <CreditCard className="h-4 w-4" />
-                  <span>Credit Details</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/dashboard/profile">
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/dashboard/logout">
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign Out</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {sidebarItems.map(({ href, icon, label }) => {
+              const isActive = pathname === href; 
+              return (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton asChild>
+                    <Link
+                      href={href}
+                      className={`${
+                        isActive
+                          ? "bg-purple-700 hover:bg-purple-900 text-white hover:text-white"
+                          : ""
+                      }`}
+                    >
+                      {icon}
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </div>
       </SidebarContent>
     </Sidebar>
-  )
+  );
 }
 

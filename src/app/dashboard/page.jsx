@@ -1,197 +1,99 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card } from "@/components/ui/card";
-import { BadgePlus } from "lucide-react";
-import { useState } from "react";
+import ActionCard from "@/components/ActionCard";
+import { albumColumns } from "@/components/tables/album/albumColumns";
+import { DataTable } from "@/components/tables/data-table";
+import { Card, CardContent } from "@/components/ui/card";
+import { BadgePlus, Loader2, Phone, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import useAlbum from "@/store/useAlbum";
+import Loader from "@/components/loader/Loader";
 
 export default function ProjectManagement() {
+  const { fetchStudioAlbums, pagination, albums, loading, error } = useAlbum();
   const router = useRouter();
   const [projectTitle, setProjectTitle] = useState("");
   const { toast } = useToast();
+  const [albumCreateLoader, setAlbumCreateLoader] = useState(false);
 
   const handleCreateProject = () => {
+    setAlbumCreateLoader(true);
     if (projectTitle.trim()) {
       router.push(
         `/dashboard/album/create?title=${encodeURIComponent(projectTitle)}`
       );
+      setAlbumCreateLoader(false);
     } else {
       toast({
         variant: "destructive",
         title: "Project Title is required",
       });
+      setAlbumCreateLoader(false);
     }
   };
+  useEffect(() => {
+    fetchStudioAlbums();
+  }, []);
+
+  if (loading) return <Loader />;
   return (
-    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-      {/* Top Section */}
+    <div className="p-6 w-full mx-auto space-y-6">
       <div className="flex flex-wrap gap-4">
-        <div className="flex items-center gap-2 border rounded-lg px-4 py-2 min-w-[200px]">
-          <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-            →
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Total Creation</div>
-            <div>1</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 border rounded-lg px-4 py-2 border-purple-500 text-purple-600 cursor-pointer hover:bg-purple-50">
-          <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center">
-            +
-          </div>
-          <div>
-            <div className="text-sm">eAlbum Credits</div>
-            <div>Buy Credits</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 border rounded-lg px-4 py-2">
-          <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-            📞
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">For support contact</div>
-            <div>+918738593947</div>
-          </div>
-        </div>
+        <ActionCard
+          icon={<Plus className="h-5 w-5 text-purple-600" />}
+          title="Total Creation"
+          description={pagination?.total}
+          descriptionBg="black"
+        />
+        <ActionCard
+          icon={<Plus className="h-5 w-5 text-purple-600" />}
+          title="eAlbum Credits"
+          description="Buy Credits"
+          descriptionBg="text-purple-500"
+        />
+        <ActionCard
+          icon={<Phone className="h-5 w-5 text-purple-600" />}
+          title="For Support Contact"
+          description="+91 9830355637"
+          descriptionBg="text-purple-500"
+        />
       </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="flex gap-2">
-          <Input
-            value={projectTitle}
-            onChange={(e) => setProjectTitle(e.target.value)}
-            placeholder="Enter Project/Event Title"
-            className="rounded-md border-gray-300"
-          />
-          <Button onClick={handleCreateProject} className="space-x-3 px-6">
-            <BadgePlus />
-            Create Project
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Enter Project/Event Code"
-            className="rounded-md border-gray-300"
-          />
-          <Button className="bg-purple-600 hover:bg-purple-700 rounded-md px-6">
-            Import Project
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">Show Entries</span>
-            <Select defaultValue="10">
-              <SelectTrigger className="w-[70px] h-8 rounded border-gray-300">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
+      <Card className="py-10 bg-[#FBF9FC]">
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex gap-2">
+              <Input
+                value={projectTitle}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                placeholder="Enter Project/Event Title"
+              />
+              <Button
+                disabled={albumCreateLoader}
+                onClick={handleCreateProject}
+                className="space-x-3 px-6"
+              >
+                <BadgePlus />
+                {albumCreateLoader ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  "Create Project"
+                )}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Input placeholder="Enter Project/Event Code" />
+              <Button className="bg-purple-600 hover:bg-purple-700 rounded-md px-6">
+                Import Project
+              </Button>
+            </div>
           </div>
-          <div className="relative">
-            <Input
-              placeholder="Search"
-              className="w-[300px] rounded border-gray-300 pr-8"
-            />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2">
-              🔍
-            </button>
-          </div>
-        </div>
-
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="text-xs font-semibold text-gray-600 py-3">
-                  #
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Code
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Action
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Title
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Person Name
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Contact No.
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Created On
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600">
-                  Action
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow className="hover:bg-gray-50">
-                <TableCell className="text-sm">1</TableCell>
-                <TableCell className="text-sm">ID7497789795</TableCell>
-                <TableCell className="text-sm">eAlbum</TableCell>
-                <TableCell className="text-sm">Akash + Anji</TableCell>
-                <TableCell className="text-sm">Mansi Bhutia</TableCell>
-                <TableCell className="text-sm">+917944535722</TableCell>
-                <TableCell className="text-sm">2023-03-09 11:04:30</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1 text-sm">
-                    <span className="text-purple-600 cursor-pointer">
-                      Share
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-purple-600 cursor-pointer">
-                      Delete
-                    </span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="flex justify-center gap-2">
-          <button className="px-4 py-1 text-sm border rounded hover:bg-gray-50">
-            Previous
-          </button>
-          <button className="px-4 py-1 text-sm border rounded bg-purple-600 text-white">
-            1
-          </button>
-          <button className="px-4 py-1 text-sm border rounded hover:bg-gray-50">
-            Next
-          </button>
-        </div>
-      </div>
-
+          <h3 className="text-xl font-bold py-4">Your Projects</h3>
+          <DataTable columns={albumColumns} data={albums} />
+        </CardContent>
+      </Card>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-6">
           <h3 className="text-lg font-medium mb-4">How To Create eAlbum?</h3>

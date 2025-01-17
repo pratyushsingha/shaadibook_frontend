@@ -1,122 +1,121 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
 import {
-  Copy,
-  Share2,
-  Download,
-  Users,
-  Image,
-  Video,
-  Mail,
-  Check,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { X, Share2, Copy, MessageCircle } from "lucide-react";
 
 const AlbumDetailsCard = ({ album }) => {
-  const { toast } = useToast();
   const [isCopied, setIsCopied] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const downloadAppLink = `https://app.ealbum.com/get?code=${album.code}`;
 
-  const handleCopyShare = () => {
-    const shareText = `
-Album: ${album.name}
-Access Code: ${album.code}
-Download app: http://hhdvjd4t5vjjws
-
-For viewing your photos and videos, please:
-1. Download the app
-2. Enter the access code: ${album.code}
-`;
-    navigator.clipboard.writeText(shareText);
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
     setIsCopied(true);
     toast({
-      title: "Share info copied to clipboard",
-      description: "You can now paste and share it",
+      title: "Copied!",
+      description: "Album details copied to clipboard",
+      duration: 2000,
     });
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  if (!album || Object.keys(album).length <= 0) {
-    return null;
-  }
-
+  const handleShare = () => {
+    console.log("Sharing to:", phoneNumber);
+  };
   return (
-    <Card className="bg-gradient-to-r from-purple-50 to-pink-50 shadow-lg">
-      <CardHeader className="border-b border-purple-100">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-2xl font-bold text-purple-900">
-            Album Created Successfully
-          </CardTitle>
-          <div className="flex gap-2">
+    <DialogContent className="max-w-md p-0 overflow-hidden rounded-lg">
+      <DialogHeader className="px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-800">
+        <DialogTitle className="text-white flex items-center gap-2">
+          <Share2 className="h-5 w-5" />
+          Share {album.action}
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="p-6 space-y-6">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Share your album via any of these methods:
+          </p>
+
+          <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 space-y-3">
+            <div className="space-y-1">
+              <h3 className="font-semibold text-purple-900">{album.name}</h3>
+              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded border">
+                <span className="text-sm text-gray-600">Access Code:</span>
+                <span className="font-mono font-medium">{album.code}</span>
+              </div>
+              <p className="text-sm text-purple-700">
+                Download app:{" "}
+                <span className="underline">{downloadAppLink}</span>
+              </p>
+            </div>
+
             <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={handleCopyShare}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2"
+              onClick={() =>
+                copyToClipboard(
+                  `${album.nameu}\nAlbum Access Code: ${album.code}\nDownload app: ${downloadAppLink}`
+                )
+              }
             >
               {isCopied ? (
-                <Check className="h-4 w-4" />
+                <>
+                  <Copy className="h-4 w-4 text-purple-200" />
+                  Copied!
+                </>
               ) : (
-                <Copy className="h-4 w-4" />
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy Details
+                </>
               )}
-              {isCopied ? "Copied!" : "Copy & Share"}
             </Button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <div className="w-full">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-purple-900 mb-2">
-                Album Details
-              </h3>
-              <div className="space-y-2">
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">Name:</span> {album.name}
-                </p>
-                <p className="flex items-center gap-2 text-purple-700 font-mono bg-purple-100 p-2 rounded">
-                  <span className="font-medium">Access Code:</span> {album.code}
-                </p>
-              </div>
-            </div>
 
-            <div>
-              <h3 className="text-lg font-semibold text-purple-900 mb-2">
-                Contact Information
-              </h3>
-              <div className="space-y-2">
-                <p className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-600" />
-                  <span className="font-medium">Contact Persons:</span>
-                  {album.contactPerson.join(", ")}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-purple-600" />
-                  <span className="font-medium">Email:</span>
-                  {album.emailIds.join(", ")}
-                </p>
-              </div>
-            </div>
-          </div>{" "}
-        </div>
-
-        <div className="mt-6 p-4 bg-purple-100 rounded-lg">
-          <h3 className="text-lg font-semibold text-purple-900 mb-2">
-            How to Access
-          </h3>
-          <div className="space-y-2 text-purple-800">
-            <p className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Download app: http://hhdvjd4t5vjjws
-            </p>
-            <p className="text-sm text-purple-600">
-              Share this information with your clients to give them access to
-              the album.
-            </p>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-3 bg-white text-gray-500 text-xs uppercase tracking-wider">
+              or send via SMS
+            </span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="relative">
+              <Input
+                type="tel"
+                placeholder="Enter 10-digit mobile number"
+                value={phoneNumber}
+                onChange={(e) =>
+                  setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))
+                }
+                className="pl-10"
+                maxLength={10}
+              />
+              <MessageCircle className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+            <Button
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white hover:from-purple-700 hover:to-purple-900 transition-all duration-300"
+              onClick={handleShare}
+              disabled={phoneNumber.length !== 10}
+            >
+              Send SMS
+            </Button>
+          </div>
+        </div>
+      </div>
+    </DialogContent>
   );
 };
 
