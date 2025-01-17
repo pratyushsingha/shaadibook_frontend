@@ -299,7 +299,7 @@ export default function CreateAlbumPage() {
       const categoryImages = uploadedUrls.map((categoryData) => ({
         category: categoryData.category,
         images: categoryData.urls.map((urlData) => ({
-          key: urlData.name,
+          key: urlData.url,
           url: urlData.url,
           mimeType:
             urlData.name.split(".").pop().toLowerCase() === "png"
