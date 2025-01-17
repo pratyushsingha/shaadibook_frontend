@@ -302,8 +302,8 @@ export default function CreateAlbumPage() {
           key: urlData.url,
           url: urlData.url,
           mimeType:
-            urlData.name.split(".").pop().toLowerCase() === "png"
-              ? "image/png"
+            urlData.name.split(".").pop().toLowerCase() === "webp"
+              ? "image/webp"
               : "image/jpeg",
         })),
       }));
