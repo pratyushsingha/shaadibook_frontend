@@ -1,11 +1,10 @@
 "use client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Eye, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   Form,
@@ -31,7 +30,7 @@ const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
-const LoginForm = () => {
+const LoginForm = ({ signupRoute }) => {
   const { toast } = useToast();
   const [showPassword, setShowpassword] = useState(false);
   const { login, error, loading, user, isAuthenticated } = useAuth();
@@ -52,7 +51,9 @@ const LoginForm = () => {
         title: `welcome ${user}`,
       });
       setTimeout(() => {
-        router.push("/dashboard/profile");
+        router.push(
+          `${user?.role === "STUDIO_ADMIN" ? "/dashboard" : "/admin/dashboard"}`
+        );
       }, 1500);
     }
     if (error && typeof error === "object") {
@@ -165,7 +166,7 @@ const LoginForm = () => {
           <div className="text-center text-sm">
             Don't have an Account?{" "}
             <Link
-              href="/signup"
+              href={signupRoute}
               className="text-purple-600 hover:text-purple-700"
             >
               Create Account

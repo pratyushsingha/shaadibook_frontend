@@ -19,7 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import useAuth from "../../store/useAuth";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "../../hooks/use-toast";
 
 const signupSchema = z.object({
@@ -40,7 +40,7 @@ const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
 });
 
-const SignupForm = () => {
+const SignupForm = ({ loginRoute, role }) => {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const { signup, loading, error, user } = useAuth();
@@ -68,7 +68,7 @@ const SignupForm = () => {
         studioName: data.studioName,
         phoneNo: data.phone,
         address: data.address,
-        role: "STUDIO_ADMIN",
+        role: role,
       });
       if (result) {
         toast({
@@ -275,7 +275,7 @@ const SignupForm = () => {
           <div className="text-center text-sm">
             Have an Account?{" "}
             <Link
-              href="/login"
+              href={loginRoute}
               className="text-purple-600 hover:text-purple-700"
             >
               Login

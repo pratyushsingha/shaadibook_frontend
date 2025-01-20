@@ -1,6 +1,7 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -19,18 +20,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import BuyCreditsModal from "../../../components/BuyCredits";
+import BuyCreditsModal from "@/components/BuyCredits";
+import useSubscription from "@/store/useSubscription";
+import { DataTable } from "../../../../components/tables/data-table";
+import { studioSubscriptionHistoryColumns } from "../../../../components/tables/subscribers/studioSubscriptionHistoryColumn";
 
 export default function CreditDetailsPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const {
+    createSubscriptionLoader,
+    getSubscriptionHistoryForStudio,
+    subscriptionHistoryLoader,
+    subscriptionHistoryError,
+    subscriptionHistory,
+  } = useSubscription();
+
+  useEffect(() => {
+    getSubscriptionHistoryForStudio();
+  }, []);
   return (
     <>
       <main className="p-6">
@@ -38,13 +48,22 @@ export default function CreditDetailsPage() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold">History</h2>
             <div className="flex gap-3">
-              <Dialog>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger>
-                  <Button className="bg-purple-600 hover:bg-purple-700">
-                    Buy eAlbum Credits
+                  <Button
+                    disabled={createSubscriptionLoader}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {createSubscriptionLoader && (
+                      <Loader2 className="animate-spin" />
+                    )}
+                    Buy Alive Print(Video) Credits
                   </Button>
                 </DialogTrigger>
-                <BuyCreditsModal />
+                <BuyCreditsModal
+                  dialogOpen={dialogOpen}
+                  setDialogOpen={setDialogOpen}
+                />
               </Dialog>
 
               <Button className="bg-purple-600 hover:bg-purple-700">
@@ -86,46 +105,13 @@ export default function CreditDetailsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input className="pl-9 w-[300px]" placeholder="Search" />
-                  </div>
                 </div>
 
                 <TabsContent value="credits" className="m-0">
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[50px]">#</TableHead>
-                          <TableHead>Order Id</TableHead>
-                          <TableHead>Product Type</TableHead>
-                          <TableHead>Number Of Credits</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Message</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Created On</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>1</TableCell>
-                          <TableCell>Order_1646753366</TableCell>
-                          <TableCell>eAlbum(ebook)</TableCell>
-                          <TableCell>5</TableCell>
-                          <TableCell>160</TableCell>
-                          <TableCell>Txn Success</TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
-                              Completed
-                            </span>
-                          </TableCell>
-                          <TableCell>2022-03-08 20:59:26</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-
+                  <DataTable
+                    columns={studioSubscriptionHistoryColumns}
+                    data={subscriptionHistory}
+                  />
                   <div className="flex items-center justify-between py-4">
                     <Button variant="outline" disabled>
                       Previous

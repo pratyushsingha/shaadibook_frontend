@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import LoginForm from "../../../components/forms/loginForm";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
+import SignupForm from "@/components/forms/signupForm";
 
 export default function LoginPage() {
   return (
@@ -21,16 +21,16 @@ export default function LoginPage() {
       <Separator />
       <main className="flex flex-1">
         <div className="hidden md:block w-1/2 bg-[#f3e8f7] relative">
-          <Image 
-            src="/auth_sidebar.png" 
-            fill 
+          <Image
+            src="/auth_sidebar.png"
+            fill
             alt="Authentication sidebar"
             className="object-cover"
             priority
           />
         </div>
         <div className="flex-1 flex flex-col">
-          <LoginForm />
+          <SignupForm loginRoute={"/login"} role={"STUDIO_ADMIN"} />
           <footer className="text-center p-4 text-sm text-muted-foreground mt-auto">
             © LOGO {new Date().getFullYear()} All Rights Reserved.
           </footer>

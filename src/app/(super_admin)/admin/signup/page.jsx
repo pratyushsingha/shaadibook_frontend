@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import SignupForm from "../../../components/forms/signupForm";
+import SignupForm from "@/components/forms/signupForm";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 
@@ -19,7 +19,7 @@ export default function LoginPage() {
         </Link>
       </header>
       <Separator />
-      <main className="flex flex-1">
+      <main className="flex flex-1">dashboard
         <div className="hidden md:block w-1/2 bg-[#f3e8f7] relative">
           <Image
             src="/auth_sidebar.png"
@@ -30,7 +30,7 @@ export default function LoginPage() {
           />
         </div>
         <div className="flex-1 flex flex-col">
-          <SignupForm />
+          <SignupForm loginRoute={"/admin/login"} role={"SUPER_ADMIN"} />
           <footer className="text-center p-4 text-sm text-muted-foreground mt-auto">
             © LOGO {new Date().getFullYear()} All Rights Reserved.
           </footer>

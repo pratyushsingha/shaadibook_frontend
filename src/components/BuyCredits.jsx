@@ -1,6 +1,7 @@
 "use client";
+import { useEffect, useState } from "react";
 
-import { Check, Sparkles, Star, Crown, X } from "lucide-react";
+import { Check, Sparkles, Star, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
@@ -10,122 +11,75 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import usePlan from "@/store/usePlan";
+import useAuth from "@/store/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { load } from "@cashfreepayments/cashfree-js";
+import useSubscription from "../store/useSubscription";
 
-const pricingTiers = [
-  {
-    category: "Basic",
-    description: "Only Photos",
-    icon: Star,
-    plans: [
-      {
-        price: 1000,
-        deposit: 5000,
-        features: ["500 Photos Upload"],
-      },
-      {
-        price: 2000,
-        features: ["Unlimited Photos Upload"],
-      },
-      {
-        price: 3500,
-        popular: true,
-        features: [
-          "Unlimited Photos Upload",
-          "100 Face Recognition",
-          "Portfolio Images - 50",
-        ],
-      },
-    ],
-  },
-  {
-    category: "Pro",
-    icon: Sparkles,
-    plans: [
-      {
-        price: 5400,
-        duration: "3 Months",
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "QR Code Design",
-          "E-Album",
-          "Album Photo Selection",
-        ],
-      },
-      {
-        price: 9600,
-        duration: "6 Months",
-        popular: true,
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "QR Code Design",
-          "E-Album",
-          "Album Photo Selection",
-        ],
-      },
-      {
-        price: 18000,
-        duration: "1 Year",
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "QR Code Design",
-          "E-Album",
-          "Album Photo Selection",
-        ],
-      },
-    ],
-  },
-  {
-    category: "Advance",
-    icon: Crown,
-    plans: [
-      {
-        price: 8500,
-        duration: "3 Months",
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "Face Recognition",
-          "QR Code Design",
-          "E-Album",
-          "Photos Selection",
-          "High Quality Photos Download",
-        ],
-      },
-      {
-        price: 16000,
-        duration: "6 Months",
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "Face Recognition",
-          "QR Code Design",
-          "E-Album",
-          "Photos Selection",
-          "High Quality Photos Download",
-        ],
-      },
-      {
-        price: 30000,
-        duration: "1 Year",
-        popular: true,
-        features: [
-          "Unlimited Events",
-          "Unlimited Photos Upload",
-          "Face Recognition",
-          "QR Code Design",
-          "E-Album",
-          "Photos Selection",
-          "High Quality Photos Download",
-        ],
-      },
-    ],
-  },
-];
+export default function BuyCreditsModal({ setDialogOpen }) {
+  const { toast } = useToast();
+  const { plans, loading: paymentLoader, error, fetchActivePlans } = usePlan();
+  const {
+    createSubscription,
+    loading: subscriptionLoader,
+    error: subscriptionError,
+  } = useSubscription();
+  const { user, loading } = useAuth();
+  const [planId, setPlanId] = useState("");
 
-export default function BuyCreditsModal() {
+  const subscriptionHandler = async (e, planId) => {
+    e.preventDefault();
+    setDialogOpen((prev) => !prev);
+
+    try {
+      const subscription = await createSubscription(planId);
+      let cashfree;
+
+      await load({
+        mode: "sandbox",
+      }).then((cf) => (cashfree = cf));
+
+      if (!subscription.session_id) {
+        console.log("Subscription failed");
+        return;
+      }
+
+      const checkoutOptions = {
+        paymentSessionId: subscription.session_id,
+        redirectTarget: "_modal",
+      };
+
+      cashfree.checkout(checkoutOptions).then((result) => {
+        if (result.error) {
+          toast({
+            variant: "destructive",
+            title: "Payment Failed",
+            description: result.error.message,
+          });
+        } else if (result.paymentDetails) {
+          toast({
+            variant: "success",
+            title: "Payment Successful",
+            description: "Your payment has been successfully processed.",
+          });
+        }
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Subscription Failed",
+        description: error.message,
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchActivePlans();
+  }, []);
+
+  if (loading) return <DialogContent>Loading...</DialogContent>;
+
   return (
     <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
@@ -151,19 +105,25 @@ export default function BuyCreditsModal() {
         </div>
 
         <div className="space-y-12">
-          {pricingTiers.map((tier) => (
+          {plans.map((tier) => (
             <div key={tier.category} className="space-y-4">
               <div className="flex items-center gap-3 pb-2">
-                <tier.icon className="w-6 h-6 text-purple-600" />
+                {tier.category === "Basic" ? (
+                  <Star className="w-6 h-6 text-purple-600" />
+                ) : tier.category === "Pro" ? (
+                  <Sparkles className="w-6 h-6 text-purple-600" />
+                ) : (
+                  <Crown className="w-6 h-6 text-purple-600" />
+                )}
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   {tier.category}
                 </h2>
-                {tier.description && (
+                {tier.features && (
                   <Badge
                     variant="secondary"
                     className="bg-purple-100 text-purple-800"
                   >
-                    {tier.description}
+                    {tier.features}
                   </Badge>
                 )}
               </div>
@@ -172,12 +132,12 @@ export default function BuyCreditsModal() {
                   <Card
                     key={index}
                     className={`border-2 flex flex-col transform transition-all duration-300 hover:scale-105 hover:shadow-lg ${
-                      plan.popular
+                      plan.isPopular
                         ? "border-purple-400 shadow-md"
                         : "hover:border-purple-200"
                     }`}
                   >
-                    {plan.popular && (
+                    {plan.isPopular && (
                       <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                         <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                           Most Popular
@@ -190,9 +150,16 @@ export default function BuyCreditsModal() {
                           <div className="text-3xl font-bold text-center bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                             ₹{plan.price.toLocaleString()}
                           </div>
-                          {plan.duration && (
+                          {plan.duration > 0 && (
                             <p className="text-center text-gray-600 font-medium">
-                              {plan.duration}
+                              {plan.duration === 30
+                                ? "Monthly"
+                                : plan.duration === 180
+                                ? "Bi-Monthly"
+                                : plan.duration === 90
+                                ? "Quarterly"
+                                : "Yearly"}{" "}
+                              Plan
                             </p>
                           )}
                           {plan.deposit && (
@@ -215,13 +182,15 @@ export default function BuyCreditsModal() {
                     </CardContent>
                     <CardFooter className="mt-auto pb-6">
                       <Button
+                        disabled={paymentLoader}
+                        onClick={(e) => subscriptionHandler(e, plan.id)}
                         className={`w-full shadow-sm ${
-                          plan.popular
+                          plan.isPopular
                             ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                             : "bg-white text-white border-2 border-purple-600 hover:bg-purple-50"
                         }`}
                       >
-                        Select Plan
+                        {planId === plan.id ? "Processing..." : "Buy Now"}
                       </Button>
                     </CardFooter>
                   </Card>

@@ -1,8 +1,8 @@
 import "./loader.css";
 const loader = () => {
-  return(
+  return (
     <div className="flex justify-center items-center h-screen">
-       <div class="loader"></div>
+      <div className="loader"></div>
     </div>
   );
 };

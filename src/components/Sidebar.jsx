@@ -14,37 +14,13 @@ import {
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
-const sidebarItems = [
-  {
-    href: "/dashboard/",
-    icon: <LayoutDashboard className="h-4 w-4" />,
-    label: "Dashboard",
-    isActive: true,
-  },
-  {
-    href: "/dashboard/credits",
-    icon: <CreditCard className="h-4 w-4" />,
-    label: "Credit Details",
-  },
-  {
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-    label: "Profile",
-  },
-  {
-    href: "/dashboard/logout",
-    icon: <LogOut className="h-4 w-4" />,
-    label: "Sign Out",
-  },
-];
-
-export function DashboardSidebar({ user }) {
+export function DashboardSidebar({ user, sidebarItems }) {
   const pathname = usePathname();
   return (
     <Sidebar className="border-r">
       <SidebarHeader className="border-b p-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <Image width={50} height={50} src="/logo.png" />
+          <Image width={50} height={50} src="/logo.png" alt="sidebar logo" />
           <h3 className="text-purple-900 font-bold text-xl">SHAADI ALBUM</h3>
         </Link>
       </SidebarHeader>
@@ -61,7 +37,7 @@ export function DashboardSidebar({ user }) {
           </div>
           <SidebarMenu>
             {sidebarItems.map(({ href, icon, label }) => {
-              const isActive = pathname === href; 
+              const isActive = pathname === href;
               return (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton asChild>
@@ -69,7 +45,7 @@ export function DashboardSidebar({ user }) {
                       href={href}
                       className={`${
                         isActive
-                          ? "bg-purple-700 hover:bg-purple-900 text-white hover:text-white"
+                          ? "bg-purple-700 text-white hover:bg-purple-800 hover:text-white"
                           : ""
                       }`}
                     >
@@ -86,4 +62,3 @@ export function DashboardSidebar({ user }) {
     </Sidebar>
   );
 }
-
