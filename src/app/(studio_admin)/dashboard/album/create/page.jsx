@@ -208,7 +208,7 @@ export default function CreateAlbumPage() {
     setIsUploading(true);
     setTotalProgress(0);
     setTotalFilesProcessed(0);
-    const albumPin = generateCode();
+    const albumPin = generateRandomNumber();
     const uploadedUrls = [];
     console.log("Generated album pin:", albumPin);
 
