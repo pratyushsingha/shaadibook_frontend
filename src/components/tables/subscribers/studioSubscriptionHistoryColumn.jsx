@@ -3,7 +3,7 @@ import { formatDistance } from "date-fns";
 
 export const studioSubscriptionHistoryColumns = [
   {
-    accessorFn: (row) => row.plan?.name,
+    accessorKey: "name",
     header: "Plan",
   },
   {
@@ -11,31 +11,12 @@ export const studioSubscriptionHistoryColumns = [
     header: "Amount",
     cell: ({ row }) => {
       const amount = row.getValue("amount");
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-      }).format(amount / 100);
-
-      return formatted;
+      return <span>{amount ? `₹ ${amount}` : "-"}</span>;
     },
   },
   {
     accessorKey: "status",
-    header: ({ column }) => {
-      return (
-        <div className="text-center">
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="font-medium hover:bg-transparent"
-          >
-            Status
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      );
-    },
+    header: "Status",
     cell: ({ row }) => {
       const status = row.getValue("status");
       return (
@@ -56,13 +37,8 @@ export const studioSubscriptionHistoryColumns = [
     },
   },
   {
-    accessorKey: "endDate",
+    accessorKey: "transactionType",
     header: "Type",
-    cell: ({ row }) => (
-      <span className="text-center">
-        {row.getValue("endDate") === null ? "ONE TIME" : "RECURRING"}
-      </span>
-    ),
   },
   {
     accessorKey: "startDate",

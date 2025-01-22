@@ -16,6 +16,11 @@ const sidebarItems = [
     isActive: true,
   },
   {
+    href: "/admin/dashboard/plans/",
+    icon: <LayoutDashboard className="h-4 w-4" />,
+    label: "Plans",
+  },
+  {
     href: "/logout",
     icon: <LogOut className="h-4 w-4" />,
     label: "Sign Out",

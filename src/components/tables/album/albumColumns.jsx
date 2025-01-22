@@ -1,15 +1,14 @@
-"use client";
 import AlbumDetailsCard from "@/components/AlbumDetailsCard";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogTrigger } from "@/components/ui/dialog";
+import { DialogTrigger, Dialog } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import useAlbum from "@/store/useAlbum";
-import { Dialog } from "@radix-ui/react-dialog";
 import { ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import DeleteDialog from "@/components/DeleteDialog";
 import { useState } from "react";
+import Link from "next/link";
 
 export const albumColumns = [
   {
@@ -45,6 +44,11 @@ export const albumColumns = [
         </Button>
       );
     },
+    cell: ({ row }) => (
+      <Link href={`/dashboard/album?albumId=${row.getValue("id")}`}>
+        <p className="text-blue-600 underline">${row.getValue("id")}</p>
+      </Link>
+    ),
   },
   {
     accessorKey: "code",

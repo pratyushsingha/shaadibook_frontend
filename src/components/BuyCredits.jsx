@@ -34,37 +34,21 @@ export default function BuyCreditsModal({ setDialogOpen }) {
 
     try {
       const subscription = await createSubscription(planId);
-      let cashfree;
-
-      await load({
+      console.log(subscription);
+      const cashfree = window.Cashfree({
         mode: "sandbox",
-      }).then((cf) => (cashfree = cf));
-
-      if (!subscription.session_id) {
-        console.log("Subscription failed");
-        return;
-      }
-
-      const checkoutOptions = {
-        paymentSessionId: subscription.session_id,
-        redirectTarget: "_modal",
-      };
-
-      cashfree.checkout(checkoutOptions).then((result) => {
-        if (result.error) {
-          toast({
-            variant: "destructive",
-            title: "Payment Failed",
-            description: result.error.message,
-          });
-        } else if (result.paymentDetails) {
-          toast({
-            variant: "success",
-            title: "Payment Successful",
-            description: "Your payment has been successfully processed.",
-          });
-        }
       });
+      if (subscription.isRecurring) {
+        cashfree.subscriptionsCheckout({
+          subsSessionId: subscription.session_id,
+          redirectTarget: "_modal",
+        });
+      } else {
+        cashfree.checkout({
+          paymentSessionId: subscription.session_id,
+          redirectTarget: "_self",
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",

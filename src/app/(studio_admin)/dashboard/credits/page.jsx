@@ -25,8 +25,8 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BuyCreditsModal from "@/components/BuyCredits";
 import useSubscription from "@/store/useSubscription";
-import { DataTable } from "../../../../components/tables/data-table";
-import { studioSubscriptionHistoryColumns } from "../../../../components/tables/subscribers/studioSubscriptionHistoryColumn";
+import { DataTable } from "@/components/tables/data-table";
+import { studioSubscriptionHistoryColumns } from "@/components/tables/subscribers/studioSubscriptionHistoryColumn";
 
 export default function CreditDetailsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);

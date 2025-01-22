@@ -1,7 +1,5 @@
 import { create } from "zustand";
-import axios from "axios";
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+import api from "@/lib/api";
 
 const useAuth = create((set) => ({
   user: null,
@@ -14,26 +12,21 @@ const useAuth = create((set) => ({
 
   setLoadingState: (loading, error = null) => set({ loading, error }),
 
+  setToken: (token) => {
+    set({ token });
+    localStorage.setItem("token", token);
+    api.defaults.headers["Authorization"] = `Bearer ${token}`;
+  },
+
   login: async ({ email, password, rememberMe }) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.post(
-        `${BASE_URL}/auth/login`,
-        {
-          email,
-          password,
-        },
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await api.post(`/auth/login`, { email, password });
       const { token, username, role } = response.data.data;
 
       if (rememberMe) {
         localStorage.setItem("token", token);
       }
-
-      axios.defaults.headers["Authorization"] = `Bearer ${token}`;
 
       set({
         user: username,
@@ -43,72 +36,33 @@ const useAuth = create((set) => ({
         error: null,
         loading: false,
       });
-      console.log(response.data.data);
-      return response.data.data;
     } catch (error) {
       set({
-        error: error.response?.data?.message || "Login failed",
+        error: error.response?.data?.error || "Login failed",
         loading: false,
       });
     }
   },
 
-  signup: async ({
-    name,
-    username,
-    email,
-    password,
-    studioName,
-    phoneNo,
-    address,
-    role,
-  }) => {
+  signup: async (signupData) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.post(
-        `${BASE_URL}/auth/studio/signup`,
-        {
-          name,
-          email,
-          password,
-          studioName,
-          phoneNo,
-          address,
-          role,
-          username,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          withCredentials: true,
-        }
-      );
-
+      const response = await api.post(`/auth/studio/signup`, signupData);
       set({ user: response.data.data, error: null, loading: false });
-      return response.data.data;
     } catch (err) {
       const fieldErrors = err.response?.data?.message?.reduce((acc, error) => {
         acc[error.path] = error.msg;
         return acc;
       }, {}) || { error: err.message || "Signup failed" };
 
-      set({
-        error: fieldErrors,
-        loading: false,
-      });
+      set({ error: fieldErrors, loading: false });
     }
   },
 
   logout: async () => {
     set({ loading: true, error: null });
     try {
-      await axios.post(
-        `${BASE_URL}/auth/logout`,
-        {},
-
-        {
-          withCredentials: true,
-        }
-      );
+      await api.post(`/auth/logout`);
       localStorage.removeItem("token");
       set({
         user: null,
@@ -126,45 +80,15 @@ const useAuth = create((set) => ({
     }
   },
 
-  editProfile: async ({
-    name,
-    address,
-    phoneNo,
-    country,
-    city,
-    zipcode,
-    logo,
-    coverImage,
-    studioName,
-    about,
-  }) => {
-    set({ profileLoading: true, loading: false, error: null });
+  editProfile: async (profileData) => {
+    set({ profileLoading: true, error: null });
     try {
-      const response = await axios.put(
-        `${BASE_URL}/auth/edit-profile`,
-        {
-          name,
-          address,
-          phoneNo,
-          country,
-          city,
-          zipcode,
-          logo,
-          coverImage,
-          studioName,
-          about,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          withCredentials: true,
-        }
-      );
+      const response = await api.put(`/auth/edit-profile`, profileData);
       set({
         user: response.data.data.user,
         error: null,
         profileLoading: false,
       });
-      return response.data.data.user;
     } catch (error) {
       set({
         error: error.response?.data?.message || "Profile update failed",
@@ -177,10 +101,9 @@ const useAuth = create((set) => ({
     set({ loading: true, error: null });
     const token = localStorage.getItem("token");
     if (token) {
-      axios.defaults.headers["Authorization"] = `Bearer ${token}`;
+      api.defaults.headers["Authorization"] = `Bearer ${token}`;
       try {
-        const response = await axios.get(`${BASE_URL}/auth/current-user`);
-        console.log(response.data.data);
+        const response = await api.get(`/auth/current-user`);
         set({
           user: response.data.data,
           role: response.data.data.role,
@@ -188,7 +111,6 @@ const useAuth = create((set) => ({
           loading: false,
         });
       } catch (error) {
-        console.error("Auth initialization failed", error);
         set({ isAuthenticated: false, error: error.message });
       }
     }

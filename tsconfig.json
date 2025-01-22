@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/hooks/use-toast.js", "src/components/ui/toaster.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/hooks/use-toast.js", "src/components/ui/toaster.jsx", "src/app/layout.tsx", "src/components/ui/layout-grid.jsx"],
   "exclude": ["node_modules"]
 }

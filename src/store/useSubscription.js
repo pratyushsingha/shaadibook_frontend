@@ -6,6 +6,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const useSubscription = create((set) => ({
   subscriptionSummary: {},
   subscriptionHistory: [],
+  studioActiveSubsciptions: [],
+  studioActiveSubsciptionsLoader: false,
+  studioActiveSubsciptionsError: null,
   subscriptionSummaryLoader: false,
   subscriptionSummaryError: null,
   subscriptionHistoryLoader: false,
@@ -37,7 +40,7 @@ const useSubscription = create((set) => ({
     } catch (error) {
       console.log(error);
       set({
-        createSubscriptionError: error.message,
+        createSubscriptionError: error.response.data.error,
         createSubscriptionLoader: false,
       });
     }
@@ -107,6 +110,26 @@ const useSubscription = create((set) => ({
       set({
         subscriptionHistoryError: error.message,
         subscriptionHistoryLoader: false,
+      });
+    }
+  },
+  getStudioActiveSubsciption: async () => {
+    set({
+      studioActiveSubsciptionsError: null,
+      studioActiveSubsciptionsLoader: true,
+    });
+    try {
+      const response = await api.get(`/subscription/studio/active`);
+      set({
+        studioActiveSubsciptions: response.data.data.activeSubscriptions,
+        studioActiveSubsciptionsLoader: false,
+      });
+      return response.data.data.activeSubscriptions;
+    } catch (error) {
+      console.log(error);
+      set({
+        studioActiveSubsciptionsError: error.response.data.error,
+        studioActiveSubsciptionsLoader: false,
       });
     }
   },

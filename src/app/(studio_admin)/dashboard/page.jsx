@@ -11,9 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import useAlbum from "@/store/useAlbum";
 import Loader from "@/components/loader/Loader";
+import { withRoleProtection } from "../../../components/withRoleProtection";
+import useSubscription from "../../../store/useSubscription";
 
-export default function ProjectManagement() {
+function page() {
   const { fetchStudioAlbums, pagination, albums, loading, error } = useAlbum();
+  const { getStudioActiveSubsciption, studioActiveSubscriptions, studi } =
+    useSubscription();
   const router = useRouter();
   const [projectTitle, setProjectTitle] = useState("");
   const { toast } = useToast();
@@ -21,11 +25,13 @@ export default function ProjectManagement() {
 
   const handleCreateProject = () => {
     setAlbumCreateLoader(true);
+
     if (projectTitle.trim()) {
-      router.push(
-        `/dashboard/album/create?title=${encodeURIComponent(projectTitle)}`
-      );
-      setAlbumCreateLoader(false);
+      setTimeout(() => {
+        router.push(
+          `/dashboard/album/create?title=${encodeURIComponent(projectTitle)}`
+        );
+      }, 100);
     } else {
       toast({
         variant: "destructive",
@@ -36,9 +42,11 @@ export default function ProjectManagement() {
   };
   useEffect(() => {
     fetchStudioAlbums();
+    getStudioActiveSubsciption();
   }, []);
 
   if (loading) return <Loader />;
+  if (error) return <div>{error}</div>;
   return (
     <div className="p-6 w-full mx-auto space-y-6">
       <div className="flex flex-wrap gap-4">
@@ -57,6 +65,13 @@ export default function ProjectManagement() {
         <ActionCard
           icon={<Phone className="h-5 w-5 text-purple-600" />}
           title="For Support Contact"
+          description="+91 9830355637"
+          descriptionBg="text-purple-500"
+        />
+
+        <ActionCard
+          icon={<Phone className="h-5 w-5 text-purple-600" />}
+          title="Active Subscription"
           description="+91 9830355637"
           descriptionBg="text-purple-500"
         />
@@ -186,3 +201,5 @@ export default function ProjectManagement() {
     </div>
   );
 }
+
+export default withRoleProtection(page, ["STUDIO_ADMIN"]);

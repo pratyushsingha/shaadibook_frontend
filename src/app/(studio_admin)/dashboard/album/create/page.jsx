@@ -64,14 +64,10 @@ const formSchema = z.object({
   attachProfile: z.boolean().default(false),
   singleSided: z.boolean().default(false),
 });
-const generateCode = () => {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "";
-  for (let i = 0; i < 6; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
+const generateRandomNumber = () => {
+  return Math.floor(Math.random() * 10);
 };
+
 
 export default function CreateAlbumPage() {
   const { toast, dismiss } = useToast();
@@ -79,9 +75,7 @@ export default function CreateAlbumPage() {
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [categories, setCategories] = useState([
-    { name: "Engagement", files: [], uploaded: false, uploadedUrls: [] },
-  ]);
+  const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
@@ -658,31 +652,35 @@ export default function CreateAlbumPage() {
                                   </div>
                                 )}
 
-                                {category.uploadedUrls.length > 0 && (
-                                  <div className="mt-6 space-y-4">
-                                    <h3 className="text-lg font-semibold">
-                                      Uploaded URLs
-                                    </h3>
-                                    <ul className="list-disc pl-5">
-                                      {category.uploadedUrls.map(
-                                        (url, index) => (
-                                          <li
-                                            key={index}
-                                            className="text-sm text-blue-600"
+                                <div className="mt-6 space-y-4">
+                                  <h3 className="text-lg font-semibold">
+                                    Uploaded Images
+                                  </h3>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {category.uploadedUrls.map((url, index) => (
+                                      <div
+                                        key={index}
+                                        className="relative group"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt={`Uploaded image ${index + 1}`}
+                                          className="w-full h-40 object-cover rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                          <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-white text-sm bg-black/50 px-3 py-1 rounded-full hover:bg-black/70 transition-colors"
                                           >
-                                            <a
-                                              href={url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                            >
-                                              {url}
-                                            </a>
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
+                                            View Full
+                                          </a>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                )}
+                                </div>
                               </div>
                             </AccordionContent>
                           </div>

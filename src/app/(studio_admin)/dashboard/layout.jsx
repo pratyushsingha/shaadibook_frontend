@@ -6,7 +6,13 @@ import { Toaster } from "@/components/ui/toaster";
 import useAuth from "@/store/useAuth";
 import Loader from "@/components/loader/Loader";
 import { DashboardSidebar } from "@/components/Sidebar";
-import { CreditCard, LayoutDashboard, LogOut, User } from "lucide-react";
+import {
+  CreditCard,
+  Grid3X3,
+  LayoutDashboard,
+  LogOut,
+  User,
+} from "lucide-react";
 
 const sidebarItems = [
   {
@@ -14,6 +20,11 @@ const sidebarItems = [
     icon: <LayoutDashboard className="h-4 w-4" />,
     label: "Dashboard",
     isActive: true,
+  },
+  {
+    href: "/dashboard/gallery/",
+    icon: <Grid3X3 className="h-4 w-4" />,
+    label: "Client Gallery",
   },
   {
     href: "/dashboard/credits",
