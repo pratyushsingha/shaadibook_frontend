@@ -1,41 +1,8 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import { Search, Loader2, Mail, Plus, X } from "lucide-react";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FileUpload } from "@/components/ui/file-upload";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import Link from "next/link";
-import { Label } from "@/components/ui/label";
-import AlbumDetailsCard from "@/components/AlbumDetailsCard";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Checkbox } from "@/components/ui/checkbox";
-import Image from "next/image";
-import useAuth from "@/store/useAuth";
 
 const BATCH_SIZE = 2;
 
@@ -64,38 +31,26 @@ const formSchema = z.object({
   attachProfile: z.boolean().default(false),
   singleSided: z.boolean().default(false),
 });
+
 const generateRandomNumber = () => {
   return Math.floor(Math.random() * 10);
 };
 
-
 export default function CreateAlbumPage() {
-  const { toast, dismiss } = useToast();
-  const { user } = useAuth();
   const [album, setAlbum] = useState({ name: "", code: "" });
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [categories, setCategories] = useState([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [totalProgress, setTotalProgress] = useState(0);
   const [totalFilesProcessed, setTotalFilesProcessed] = useState(0);
-
   const [totalFiles, setTotalFiles] = useState(0);
-
-  useEffect(() => {
-    const total = categories.reduce(
-      (acc, category) => acc + category.files.length,
-      0
-    );
-    setTotalFiles(total);
-  }, [categories]);
+  const [albumPin, setAlbumPin] = useState(null);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      studioName: user?.studioName || "",
+      studioName: "",
       contactPerson1: "",
       contactPerson2: "",
       emailIds: "",
@@ -109,22 +64,13 @@ export default function CreateAlbumPage() {
     setTitle(params.get("title") || "");
   }, []);
 
-  const handleAddCategory = () => {
-    const categoryName = prompt("Please enter a category name:");
-    if (categoryName) {
-      setCategories((prevCategories) => [
-        {
-          name: categoryName.trim(),
-          files: [],
-          uploaded: false,
-          uploadedUrls: [],
-        },
-        ...prevCategories,
-      ]);
-    } else {
-      alert("Category name cannot be empty. Please try again.");
-    }
-  };
+  useEffect(() => {
+    const total = categories.reduce(
+      (acc, category) => acc + category.files.length,
+      0
+    );
+    setTotalFiles(total);
+  }, [categories]);
 
   const uploadImageBatch = async (
     images,
@@ -134,7 +80,6 @@ export default function CreateAlbumPage() {
     updateProgress
   ) => {
     const formData = new FormData();
-
     images.forEach((img) => {
       const actualFile = img.file || img;
       formData.append("files", actualFile);
@@ -180,50 +125,34 @@ export default function CreateAlbumPage() {
   };
 
   const handleUpload = async (values) => {
-    console.log("Upload started", { values, categories });
-
     if (
       !values.studioName ||
       !values.contactPerson1 ||
       !values.contactPerson2 ||
       !values.emailIds
     ) {
-      toast({
-        title: "Missing required fields",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+      console.error("Missing required fields");
       return;
     }
 
     if (!categories.some((category) => category.files.length > 0)) {
-      toast({
-        title: "No files selected",
-        description: "Please select files to upload",
-        variant: "destructive",
-      });
+      console.error("No files selected");
       return;
     }
 
     setIsUploading(true);
     setTotalProgress(0);
     setTotalFilesProcessed(0);
-    const albumPin = generateRandomNumber();
-    const uploadedUrls = [];
-    console.log("Generated album pin:", albumPin);
 
-    const uploadToastId = toast({
-      title: "Starting Upload",
-      description: "Preparing files...",
-      duration: Infinity,
-    });
+    const generatedPin = generateRandomNumber();
+    setAlbumPin(generatedPin);
+    console.log("Generated album pin:", generatedPin);
 
     try {
+      const uploadedUrls = [];
+
       for (const category of categories) {
         if (!category.files.length) continue;
-        console.log(
-          `Processing category: ${category.name} with ${category.files.length} files`
-        );
 
         const totalBatches = Math.ceil(category.files.length / BATCH_SIZE);
         const categoryUrls = [];
@@ -236,16 +165,10 @@ export default function CreateAlbumPage() {
           );
           const batch = category.files.slice(startIndex, endIndex);
 
-          console.log(
-            `Uploading batch ${batchIndex + 1} of ${totalBatches} for ${
-              category.name
-            }`
-          );
-
           try {
             const batchResponse = await uploadImageBatch(
               batch,
-              albumPin,
+              generatedPin,
               category.name,
               startIndex,
               (fileId, progress) => {
@@ -274,11 +197,6 @@ export default function CreateAlbumPage() {
             });
           } catch (error) {
             console.error(`Batch upload error:`, error);
-            toast({
-              title: `Failed to upload batch ${batchIndex + 1}`,
-              description: error.message,
-              variant: "destructive",
-            });
             throw error;
           }
         }
@@ -289,7 +207,6 @@ export default function CreateAlbumPage() {
         });
       }
 
-      console.log("All files uploaded, creating album");
       const categoryImages = uploadedUrls.map((categoryData) => ({
         category: categoryData.category,
         images: categoryData.urls.map((urlData) => ({
@@ -309,11 +226,9 @@ export default function CreateAlbumPage() {
         images: categoryImages,
         profileAttached: values.attachProfile,
         isSingleSlided: values.singleSided,
-        code: albumPin,
+        code: generatedPin,
         action: "E_ALBUM",
       };
-
-      console.log("Sending album creation payload:", albumPayload);
 
       const createResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/create`,
@@ -332,26 +247,12 @@ export default function CreateAlbumPage() {
       }
 
       const createData = await createResponse.json();
-      console.log("Album created successfully:", createData);
       setAlbum(createData.data);
-      setIsDialogOpen(true);
-
-      dismiss(uploadToastId);
-      toast({
-        title: "Album created successfully",
-        description: `All files uploaded successfully`,
-        duration: 5000,
-      });
     } catch (error) {
       console.error("Album creation error:", error);
-      dismiss(uploadToastId);
-      toast({
-        title: "Failed to create album",
-        description: error.message,
-        variant: "destructive",
-      });
     } finally {
       setIsUploading(false);
+      setAlbumPin(null);
       categories.forEach((category) => {
         category.files.forEach((fileObj) => {
           if (fileObj.preview) {
@@ -359,6 +260,21 @@ export default function CreateAlbumPage() {
           }
         });
       });
+    }
+  };
+
+  const handleAddCategory = () => {
+    const categoryName = prompt("Please enter a category name:");
+    if (categoryName) {
+      setCategories((prevCategories) => [
+        {
+          name: categoryName.trim(),
+          files: [],
+          uploaded: false,
+          uploadedUrls: [],
+        },
+        ...prevCategories,
+      ]);
     }
   };
 
@@ -372,7 +288,6 @@ export default function CreateAlbumPage() {
       return updatedCategories;
     });
   };
-
   return (
     <>
       <main className="p-6">
