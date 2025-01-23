@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import { Search, Loader2, Mail, Plus, X, Download } from "lucide-react";
 import {
   Form,
@@ -36,7 +36,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
 import useAuth from "@/store/useAuth";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 const BATCH_SIZE = 2;
 
@@ -74,7 +74,7 @@ const generateCode = () => {
   return result;
 };
 
-export default function CreateAlbumPage() {
+function CreateAlbumContent() {
   const { toast, dismiss } = useToast();
   const { user } = useAuth();
   const [album, setAlbum] = useState({ name: "", code: "" });
@@ -108,11 +108,11 @@ export default function CreateAlbumPage() {
     },
   });
 
+  const searchParams = useSearchParams(); // Use useSearchParams
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setTitle(params.get("title") || "");
-  }, []);
-
+    const title = searchParams.get("title") || "";
+    setTitle(title);
+  }, [searchParams]);
   const handleDownload = async (url, filename) => {
     try {
       const response = await fetch(url);
@@ -733,3 +733,14 @@ export default function CreateAlbumPage() {
     </>
   );
 }
+
+
+const CreateAlbumPage = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CreateAlbumContent />
+    </Suspense>
+  );
+};
+
+export default CreateAlbumPage;

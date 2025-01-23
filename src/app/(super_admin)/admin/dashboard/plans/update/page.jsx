@@ -1,14 +1,16 @@
 "use client";
 
+import { Suspense } from "react"; // Import Suspense
 import { useSearchParams } from "next/navigation";
 import PlanUpdateForm from "../../../../../../components/forms/updatePlanForm";
 import { Button } from "../../../../../../components/ui/button";
 import Link from "next/link";
 
-const page = () => {
+const UpdatePlanContent = () => {
   const searchParams = useSearchParams();
   const planId = searchParams.get("id");
   console.log(planId);
+
   return (
     <section className="mx-5 my-10">
       <div className="flex space-x-3">
@@ -16,7 +18,7 @@ const page = () => {
           <Button>Back</Button>
         </Link>
         <h2 className="text-2xl font-bold mb-5">
-          update Plan <span className="font-extrabold ">{planId}</span>
+          Update Plan <span className="font-extrabold ">{planId}</span>
         </h2>
       </div>
       <PlanUpdateForm planId={planId} />
@@ -24,4 +26,12 @@ const page = () => {
   );
 };
 
-export default page;
+const UpdatePlanPage = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <UpdatePlanContent />
+    </Suspense>
+  );
+};
+
+export default UpdatePlanPage;

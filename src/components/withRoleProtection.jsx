@@ -1,4 +1,4 @@
-'use client';
+"use client"; // Add this directive
 
 import { useEffect } from "react";
 import useAuth from "@/store/useAuth";

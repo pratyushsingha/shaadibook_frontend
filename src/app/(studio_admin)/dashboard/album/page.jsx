@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import {
   CalendarDays,
   Mail,
@@ -32,7 +32,9 @@ const AlbumDetails = () => {
   const [statusLoading, setStatusLoading] = useState(false);
 
   useEffect(() => {
-    getAlbumDetailsById(albumId);
+    if (albumId) {
+      getAlbumDetailsById(albumId);
+    }
   }, [albumId]);
 
   useEffect(() => {
@@ -258,4 +260,10 @@ const ArrayDisplay = React.memo(({ items, className = "" }) => (
   </div>
 ));
 
-export default AlbumDetails;
+const AlbumDetailsWrapper = () => (
+  <Suspense fallback={<Loader />}>
+    <AlbumDetails />
+  </Suspense>
+);
+
+export default AlbumDetailsWrapper;
