@@ -61,6 +61,7 @@ function page() {
           title="eAlbum Credits"
           description="Buy Credits"
           descriptionBg="text-purple-500"
+          href="/dashboard/credits"
         />
         <ActionCard
           icon={<Phone className="h-5 w-5 text-purple-600" />}

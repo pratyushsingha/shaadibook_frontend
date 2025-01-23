@@ -36,15 +36,7 @@ export default function ShareDialog({ album }) {
   return (
     <DialogContent className="max-w-md p-6">
       <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <DialogTitle>Share eAlbum</DialogTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 rounded-full p-0"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </Button>
+        <DialogTitle>Share Event Id</DialogTitle>
       </DialogHeader>
 
       <div className="space-y-4">
