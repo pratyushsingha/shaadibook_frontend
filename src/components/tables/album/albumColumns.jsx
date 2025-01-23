@@ -137,7 +137,7 @@ export const albumColumns = [
       return (
         <div className="flex">
           <Dialog className="w-10/12">
-            <DialogTrigger>
+            <DialogTrigger asChild>
               <Button
                 type="button"
                 onClick={() => {

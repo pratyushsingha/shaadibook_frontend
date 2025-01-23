@@ -1,4 +1,5 @@
 import axios from "axios";
+import api from "@/lib/api";
 import { create } from "zustand";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -128,7 +129,7 @@ const useSubscription = create((set) => ({
     } catch (error) {
       console.log(error);
       set({
-        studioActiveSubsciptionsError: error.response.data.error,
+        studioActiveSubsciptionsError: error.response?.data?.error,
         studioActiveSubsciptionsLoader: false,
       });
     }

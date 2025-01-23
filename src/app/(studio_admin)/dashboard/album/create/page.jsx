@@ -1,8 +1,42 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { Search, Loader2, Mail, Plus, X, Download } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FileUpload } from "@/components/ui/file-upload";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import Link from "next/link";
+import { Label } from "@/components/ui/label";
+import AlbumDetailsCard from "@/components/AlbumDetailsCard";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
+import Image from "next/image";
+import useAuth from "@/store/useAuth";
+import { useRouter } from "next/navigation";
 
 const BATCH_SIZE = 2;
 
@@ -32,25 +66,40 @@ const formSchema = z.object({
   singleSided: z.boolean().default(false),
 });
 
-const generateRandomNumber = () => {
-  return Math.floor(Math.random() * 10);
+const generateCode = () => {
+  let result = "";
+  for (let i = 0; i < 10; i++) {
+    result += Math.floor(Math.random() * 10);
+  }
+  return result;
 };
 
 export default function CreateAlbumPage() {
+  const { toast, dismiss } = useToast();
+  const { user } = useAuth();
   const [album, setAlbum] = useState({ name: "", code: "" });
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [categories, setCategories] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [totalProgress, setTotalProgress] = useState(0);
   const [totalFilesProcessed, setTotalFilesProcessed] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
-  const [albumPin, setAlbumPin] = useState(null);
+
+  useEffect(() => {
+    const total = categories.reduce(
+      (acc, category) => acc + category.files.length,
+      0
+    );
+    setTotalFiles(total);
+  }, [categories]);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      studioName: "",
+      studioName: user?.studioName || "",
       contactPerson1: "",
       contactPerson2: "",
       emailIds: "",
@@ -64,13 +113,44 @@ export default function CreateAlbumPage() {
     setTitle(params.get("title") || "");
   }, []);
 
-  useEffect(() => {
-    const total = categories.reduce(
-      (acc, category) => acc + category.files.length,
-      0
-    );
-    setTotalFiles(total);
-  }, [categories]);
+  const handleDownload = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename || "downloaded-image";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the image. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddCategory = () => {
+    const categoryName = prompt("Please enter a category name:");
+    if (categoryName) {
+      setCategories((prevCategories) => [
+        {
+          name: categoryName.trim(),
+          files: [],
+          uploaded: false,
+          uploadedUrls: [],
+        },
+        ...prevCategories,
+      ]);
+    } else {
+      alert("Category name cannot be empty. Please try again.");
+    }
+  };
 
   const uploadImageBatch = async (
     images,
@@ -80,6 +160,7 @@ export default function CreateAlbumPage() {
     updateProgress
   ) => {
     const formData = new FormData();
+
     images.forEach((img) => {
       const actualFile = img.file || img;
       formData.append("files", actualFile);
@@ -113,7 +194,19 @@ export default function CreateAlbumPage() {
         const categoryIndex = updatedCategories.findIndex(
           (cat) => cat.name === category
         );
-        updatedCategories[categoryIndex].uploadedUrls.push(...data.fileLinks);
+
+        const updatedFiles = [...updatedCategories[categoryIndex].files];
+        data.fileLinks.forEach((urlObj, idx) => {
+          if (updatedFiles[startIndex + idx]) {
+            updatedFiles[startIndex + idx].tempUrl = urlObj.tempUrl; // Temporary URL for preview
+            updatedFiles[startIndex + idx].compressedUrl = urlObj.compressedUrl; // Compressed URL for album creation
+          }
+        });
+
+        updatedCategories[categoryIndex].files = updatedFiles;
+        updatedCategories[categoryIndex].uploadedUrls.push(
+          ...data.fileLinks.map((urlObj) => urlObj.compressedUrl)
+        );
         return updatedCategories;
       });
 
@@ -125,34 +218,50 @@ export default function CreateAlbumPage() {
   };
 
   const handleUpload = async (values) => {
+    console.log("Upload started", { values, categories });
+
     if (
       !values.studioName ||
       !values.contactPerson1 ||
       !values.contactPerson2 ||
       !values.emailIds
     ) {
-      console.error("Missing required fields");
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!categories.some((category) => category.files.length > 0)) {
-      console.error("No files selected");
+      toast({
+        title: "No files selected",
+        description: "Please select files to upload",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsUploading(true);
     setTotalProgress(0);
     setTotalFilesProcessed(0);
+    const albumPin = generateCode();
+    const uploadedUrls = [];
+    console.log("Generated album pin:", albumPin);
 
-    const generatedPin = generateRandomNumber();
-    setAlbumPin(generatedPin);
-    console.log("Generated album pin:", generatedPin);
+    const uploadToastId = toast({
+      title: "Starting Upload",
+      description: "Preparing files...",
+      duration: Infinity,
+    });
 
     try {
-      const uploadedUrls = [];
-
       for (const category of categories) {
         if (!category.files.length) continue;
+        console.log(
+          `Processing category: ${category.name} with ${category.files.length} files`
+        );
 
         const totalBatches = Math.ceil(category.files.length / BATCH_SIZE);
         const categoryUrls = [];
@@ -165,10 +274,16 @@ export default function CreateAlbumPage() {
           );
           const batch = category.files.slice(startIndex, endIndex);
 
+          console.log(
+            `Uploading batch ${batchIndex + 1} of ${totalBatches} for ${
+              category.name
+            }`
+          );
+
           try {
             const batchResponse = await uploadImageBatch(
               batch,
-              generatedPin,
+              albumPin,
               category.name,
               startIndex,
               (fileId, progress) => {
@@ -181,8 +296,8 @@ export default function CreateAlbumPage() {
 
             if (batchResponse && batchResponse.fileLinks) {
               categoryUrls.push(
-                ...batchResponse.fileLinks.map((url, index) => ({
-                  url,
+                ...batchResponse.fileLinks.map((urlObj, index) => ({
+                  url: urlObj.compressedUrl, 
                   name: batch[index].name,
                   category: category.name,
                 }))
@@ -197,6 +312,11 @@ export default function CreateAlbumPage() {
             });
           } catch (error) {
             console.error(`Batch upload error:`, error);
+            toast({
+              title: `Failed to upload batch ${batchIndex + 1}`,
+              description: error.message,
+              variant: "destructive",
+            });
             throw error;
           }
         }
@@ -207,6 +327,7 @@ export default function CreateAlbumPage() {
         });
       }
 
+      console.log("All files uploaded, creating album");
       const categoryImages = uploadedUrls.map((categoryData) => ({
         category: categoryData.category,
         images: categoryData.urls.map((urlData) => ({
@@ -226,9 +347,11 @@ export default function CreateAlbumPage() {
         images: categoryImages,
         profileAttached: values.attachProfile,
         isSingleSlided: values.singleSided,
-        code: generatedPin,
+        code: albumPin,
         action: "E_ALBUM",
       };
+
+      console.log("Sending album creation payload:", albumPayload);
 
       const createResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/create`,
@@ -247,12 +370,26 @@ export default function CreateAlbumPage() {
       }
 
       const createData = await createResponse.json();
+      console.log("Album created successfully:", createData);
       setAlbum(createData.data);
+      setIsDialogOpen(true);
+
+      dismiss(uploadToastId);
+      toast({
+        title: "Album created successfully",
+        description: `All files uploaded successfully`,
+        duration: 5000,
+      });
     } catch (error) {
       console.error("Album creation error:", error);
+      dismiss(uploadToastId);
+      toast({
+        title: "Failed to create album",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
-      setAlbumPin(null);
       categories.forEach((category) => {
         category.files.forEach((fileObj) => {
           if (fileObj.preview) {
@@ -262,32 +399,14 @@ export default function CreateAlbumPage() {
       });
     }
   };
-
-  const handleAddCategory = () => {
-    const categoryName = prompt("Please enter a category name:");
-    if (categoryName) {
-      setCategories((prevCategories) => [
-        {
-          name: categoryName.trim(),
-          files: [],
-          uploaded: false,
-          uploadedUrls: [],
-        },
-        ...prevCategories,
-      ]);
-    }
-  };
-
   const handleFileUpload = (files, categoryIndex) => {
     setCategories((prevCategories) => {
       const updatedCategories = [...prevCategories];
-      updatedCategories[categoryIndex].files = [
-        ...updatedCategories[categoryIndex].files,
-        ...files,
-      ];
+      updatedCategories[categoryIndex].files = files;
       return updatedCategories;
     });
   };
+
   return (
     <>
       <main className="p-6">
@@ -458,6 +577,7 @@ export default function CreateAlbumPage() {
                       />
                     </div>
                   </div>
+
                   <div className={`${isUploading ? "block" : "hidden"}`}>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium">
@@ -473,6 +593,7 @@ export default function CreateAlbumPage() {
                       className="h-2 w-full bg-gray-200"
                     />
                   </div>
+
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-medium">Upload Album Images</h3>
@@ -487,6 +608,7 @@ export default function CreateAlbumPage() {
                         </Button>
                       </div>
                     </div>
+
                     {categories.map((category, categoryIndex) => (
                       <Accordion
                         type="single"
@@ -514,88 +636,78 @@ export default function CreateAlbumPage() {
                                   disabled={isUploading}
                                 />
 
-                                {category.files.length > 0 && (
-                                  <div className="mt-6 space-y-4">
-                                    <h3 className="text-lg font-semibold">
-                                      Uploaded Files
-                                    </h3>
-                                    <div className="flex flex-wrap gap-4">
-                                      {category.files.map((file, fileIndex) => {
-                                        const fileId = `${category.name}-${file.name}-${fileIndex}`;
-                                        const progress =
-                                          uploadProgress[fileId] || 0;
-                                        return (
-                                          <div
-                                            key={fileId}
-                                            className="w-1/4 p-2 mx-auto"
-                                          >
-                                            <div className="space-y-2">
-                                              <div className="flex justify-between items-center">
-                                                <div className="flex flex-col items-center w-full">
-                                                  {file.preview ? (
-                                                    <Image
-                                                      width={128}
-                                                      height={128}
-                                                      src={file?.preview}
-                                                      alt={file.name}
-                                                      className="w-full h-40 object-cover rounded"
-                                                    />
-                                                  ) : (
-                                                    <div className="w-full h-40 bg-gray-200 animate-pulse rounded"></div>
-                                                  )}
+                                {category.files.map((file, fileIndex) => {
+                                  const fileId = `${category.name}-${file.name}-${fileIndex}`;
+                                  const progress = uploadProgress[fileId] || 0;
 
-                                                  <span className="text-sm text-gray-600">
-                                                    {file.name}
-                                                  </span>
-                                                  <div className="w-full flex space-x-2">
-                                                    <span className="text-sm text-gray-600">
-                                                      {progress}%
-                                                    </span>
-                                                    <Progress
-                                                      value={progress}
-                                                      max={100}
-                                                      className="h-2 self-center"
-                                                    />
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="mt-6 space-y-4">
-                                  <h3 className="text-lg font-semibold">
-                                    Uploaded Images
-                                  </h3>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {category.uploadedUrls.map((url, index) => (
-                                      <div
-                                        key={index}
-                                        className="relative group"
-                                      >
-                                        <img
-                                          src={url}
-                                          alt={`Uploaded image ${index + 1}`}
-                                          className="w-full h-40 object-cover rounded-lg shadow-sm hover:opacity-90 transition-opacity"
-                                        />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                                          <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-white text-sm bg-black/50 px-3 py-1 rounded-full hover:bg-black/70 transition-colors"
-                                          >
-                                            View Full
-                                          </a>
+                                  return (
+                                    <div
+                                      key={fileId}
+                                      className="flex items-center justify-between p-3 border rounded-lg bg-white shadow-sm"
+                                    >
+                                      <div className="flex items-center space-x-4">
+                                        <div className="w-12 h-12 bg-gray-200 flex-shrink-0 rounded overflow-hidden">
+                                          {file.tempUrl || file.preview ? (
+                                            <Image
+                                              width={48}
+                                              height={48}
+                                              src={file.tempUrl || file.preview} // Use tempUrl for preview
+                                              alt={file.name}
+                                              className="object-cover w-full h-full"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full animate-pulse bg-gray-300"></div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium text-gray-800 truncate">
+                                            {file.name}
+                                          </p>
+                                          <p className="text-xs text-gray-500">
+                                            {Math.round(file.size / 1024)} KB
+                                          </p>
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
+
+                                      <div className="flex items-center space-x-4">
+                                        <div className="flex items-center space-x-2">
+                                          {progress < 100 ? (
+                                            <span className="text-sm text-blue-500">
+                                              Uploading... ({progress}%)
+                                            </span>
+                                          ) : (
+                                            <span className="text-sm text-green-500">
+                                              Uploaded
+                                            </span>
+                                          )}
+                                          <Progress
+                                            value={progress}
+                                            max={100}
+                                            className="w-32 h-2 bg-gray-200 rounded"
+                                          />
+                                        </div>
+                                        {file.compressedUrl && (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={
+                                              () =>
+                                                handleDownload(
+                                                  file.compressedUrl,
+                                                  file.name
+                                                ) 
+                                            }
+                                            className="ml-2"
+                                          >
+                                            <Download className="w-4 h-4 mr-1" />
+                                            Download
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </AccordionContent>
                           </div>
@@ -613,7 +725,9 @@ export default function CreateAlbumPage() {
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
         >
-          <AlbumDetailsCard album={album} />
+          <DialogContent>
+            <AlbumDetailsCard album={album} />
+          </DialogContent>
         </Dialog>
       </main>
     </>

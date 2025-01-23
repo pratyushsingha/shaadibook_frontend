@@ -8,49 +8,92 @@ import {
   Copy,
   Ticket,
   Check,
+  Download,
 } from "lucide-react";
 import useAlbum from "../../../../store/useAlbum";
 import { useSearchParams } from "next/navigation";
 import Loader from "@/components/loader/Loader";
 import Image from "next/image";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import axios from "axios";
 
-const page = () => {
+const AlbumDetails = () => {
   const searchParams = useSearchParams();
   const albumId = searchParams.get("albumId");
   const { getAlbumDetailsById, album, loading, error } = useAlbum();
   const [isCopied, setIsCopied] = useState(false);
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(text);
-    setIsCopied(true);
-    toast({
-      title: "Copied!",
-      description: "Album details copied to clipboard",
-      duration: 2000,
-    });
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+  const [albumStatus, setAlbumStatus] = useState(null);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   useEffect(() => {
     getAlbumDetailsById(albumId);
-  }, []);
+  }, [albumId]);
 
-  const ArrayDisplay = ({ items, className = "" }) => (
-    <div className={`flex flex-wrap gap-2 ${className}`}>
-      {items?.map((item, index) => (
-        <span
-          key={index}
-          className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm"
-        >
-          {item}
-        </span>
-      ))}
-    </div>
-  );
-  if (loading) return <Loader />;
+  useEffect(() => {
+    const fetchAlbumStatus = async () => {
+      if (!album?.code) return;
+
+      setStatusLoading(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/album-status/${album.code}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setAlbumStatus(data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching album status:", error);
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+
+    fetchAlbumStatus();
+  }, [album?.code]);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(album.code);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleDownload = async (file) => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/download/${file.key
+          .split("/")
+          .pop()}`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      const filename = file.key.split("/").pop() || `image_${file.id}`;
+      const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  if (loading || statusLoading) return <Loader />;
   if (error) return <div>{error}</div>;
+
   return (
-    <div className="max-w-full mx-auto p-6 space-y-8">
+    <div className="max-w-11/12 p-6 space-y-8">
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-start mb-6">
           <div>
@@ -114,66 +157,105 @@ const page = () => {
         </div>
       </div>
 
-      {album?.AlbumCategory?.map((category) => (
-        <div key={category.id} className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-            {category.name}
+      {albumStatus && (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">
+            Album Processing Status
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {category.files.map((file) => (
-              <div key={file.id} className="group relative">
-                <Image
-                  width={200}
-                  height={200}
-                  src={file.key}
-                  alt="Album"
-                  className="w-full h-48 object-cover rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-[1.02]"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                  <a
-                    href={file.key}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-white bg-black/50 px-4 py-2 rounded-full hover:bg-black/70 transition-colors"
-                  >
-                    View Full
-                  </a>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+              <Check className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="text-sm text-gray-500">Processed Images</p>
+                <p className="font-medium">{albumStatus.processedFiles}</p>
               </div>
-            ))}
+            </div>
+            <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+              <Ticket className="h-5 w-5 text-yellow-600" />
+              <div>
+                <p className="text-sm text-gray-500">Remaining Images</p>
+                <p className="font-medium">{albumStatus.remainingFiles}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+              <Copy className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="text-sm text-gray-500">Failed Images</p>
+                <p className="font-medium">{albumStatus.failedFiles}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6">
+            <p className="text-sm text-gray-500">Overall Status</p>
+            <p
+              className={`font-medium ${
+                albumStatus.overallStatus === "success"
+                  ? "text-green-600"
+                  : albumStatus.overallStatus === "partial_success"
+                  ? "text-yellow-600"
+                  : albumStatus.overallStatus === "in_progress"
+                  ? "text-blue-600"
+                  : "text-red-600"
+              }`}
+            >
+              {albumStatus.overallStatus === "success"
+                ? "Successfully Processed"
+                : albumStatus.overallStatus === "partial_success"
+                ? "Partially Processed"
+                : albumStatus.overallStatus === "in_progress"
+                ? "In Progress"
+                : "Failed"}
+            </p>
           </div>
         </div>
-      ))}
+      )}
 
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">
-          Album Settings
-        </h2>
-        <div className="flex flex-wrap gap-6">
-          <div className="flex items-center">
-            <div
-              className={`w-3 h-3 rounded-full mr-2 ${
-                album.profileAttached ? "bg-green-500" : "bg-red-500"
-              }`}
-            />
-            <span className="text-gray-700">
-              Profile {album.profileAttached ? "Attached" : "Not Attached"}
-            </span>
-          </div>
-          <div className="flex items-center">
-            <div
-              className={`w-3 h-3 rounded-full mr-2 ${
-                album.isSingleSlided ? "bg-green-500" : "bg-red-500"
-              }`}
-            />
-            <span className="text-gray-700">
-              {album.isSingleSlided ? "Single Sided" : "Double Sided"}
-            </span>
-          </div>
-        </div>
-      </div>
+      <Accordion type="multiple" className="w-full">
+        {album?.AlbumCategory?.map((category) => (
+          <AccordionItem key={category.id} value={category.id}>
+            <AccordionTrigger className="text-xl font-semibold">
+              {category.name}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {category.files.map((file) => (
+                  <div key={file.id} className="relative aspect-square group">
+                    <Image
+                      src={file.key}
+                      alt={`Image ${file.id}`}
+                      fill
+                      className="object-cover rounded-lg"
+                    />
+                    <Button
+                      size="sm"
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleDownload(file)}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
     </div>
   );
 };
 
-export default page;
+const ArrayDisplay = React.memo(({ items, className = "" }) => (
+  <div className={`flex flex-wrap gap-2 ${className}`}>
+    {items?.map((item, index) => (
+      <span
+        key={index}
+        className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm"
+      >
+        {item}
+      </span>
+    ))}
+  </div>
+));
+
+export default AlbumDetails;
