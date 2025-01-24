@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import { Search, Loader2, Mail, Plus, X, Download } from "lucide-react";
+
+import { Search, Plus, Trash2, Loader2, Mail, Download } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -15,41 +15,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FileUpload } from "@/components/ui/file-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
-import Link from "next/link";
 import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
 import AlbumDetailsCard from "@/components/AlbumDetailsCard";
+import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
-import useAuth from "@/store/useAuth";
-import { useRouter } from "next/navigation";
 
-const BATCH_SIZE = 2;
+const CHUNK_SIZE = 5 * 1024 * 1024;
 
 const formSchema = z.object({
-  studioName: z
-    .string()
-    .min(2, { message: "Studio name must be at least 2 characters." }),
-  contactPerson1: z
-    .string()
-    .min(2, { message: "Contact person name must be at least 2 characters." }),
-  contactPerson2: z
-    .string()
-    .min(2, { message: "Contact person name must be at least 2 characters." }),
+  studioName: z.string().min(2, {
+    message: "Studio name must be at least 2 characters.",
+  }),
+  contactPerson1: z.string().min(2, {
+    message: "Contact person name must be at least 2 characters.",
+  }),
+  contactPerson2: z.string().min(2, {
+    message: "Contact person name must be at least 2 characters.",
+  }),
   emailIds: z.string().refine(
     (val) => {
       const emails = val.split(",").map((e) => e.trim());
@@ -66,25 +64,17 @@ const formSchema = z.object({
   singleSided: z.boolean().default(false),
 });
 
-const generateCode = () => {
-  let result = "";
-  for (let i = 0; i < 10; i++) {
-    result += Math.floor(Math.random() * 10);
-  }
-  return result;
-};
-
 export default function CreateAlbumPage() {
-  const { toast, dismiss } = useToast();
-  const { user } = useAuth();
+  const { toast } = useToast();
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [categories, setCategories] = useState([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categories, setCategories] = useState([
+    { name: "Engagement", files: [], uploaded: false },
+  ]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [totalProgress, setTotalProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [fileProgress, setFileProgress] = useState({});
   const [totalFilesProcessed, setTotalFilesProcessed] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
 
@@ -96,10 +86,15 @@ export default function CreateAlbumPage() {
     setTotalFiles(total);
   }, [categories]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setTitle(params.get("title") || "");
+  }, []);
+
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      studioName: user?.studioName || "",
+      studioName: "",
       contactPerson1: "",
       contactPerson2: "",
       emailIds: "",
@@ -108,251 +103,229 @@ export default function CreateAlbumPage() {
     },
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setTitle(params.get("title") || "");
-  }, []);
+  const handleFileUpload = async (files, categoryIndex) => {
+    const updatedCategories = [...categories];
+    const category = updatedCategories[categoryIndex];
 
-  const handleDownload = async (url, filename) => {
-    try {
-      console.log("Downloading file:", url);
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename || "downloaded-image";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (error) {
-      console.error("Download failed:", error);
-      toast({
-        title: "Download Failed",
-        description: "Failed to download the image. Please try again.",
-        variant: "destructive",
-      });
-    }
+    category.files = [...category.files, ...Array.from(files)];
+    setCategories(updatedCategories);
   };
 
-  const handleAddCategory = () => {
-    const categoryName = prompt("Please enter a category name:");
-    if (categoryName) {
-      setCategories((prevCategories) => [
-        {
-          name: categoryName.trim(),
-          files: [],
-          uploaded: false,
-          uploadedUrls: [],
-        },
-        ...prevCategories,
-      ]);
-    } else {
-      alert("Category name cannot be empty. Please try again.");
-    }
+  const handleRemoveFile = (categoryIndex, fileIndex) => {
+    const updatedCategories = [...categories];
+    updatedCategories[categoryIndex].files.splice(fileIndex, 1);
+    setCategories(updatedCategories);
   };
 
-  const uploadImageBatch = async (
-    images,
-    albumPin,
-    category,
-    startIndex,
-    updateProgress
-  ) => {
-    const formData = new FormData();
-
-    images.forEach((img) => {
-      const actualFile = img.file || img;
-      formData.append("files", actualFile);
-    });
-
-    formData.append("albumPin", albumPin);
-    formData.append("category", category);
-
+  const uploadFileChunks = async (fileData, file) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/upload`,
+      const chunks = [];
+      let start = 0;
+      while (start < file.size) {
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        chunks.push(file.slice(start, end));
+        start = end;
+      }
+
+      const { key, presignedUrls } = fileData;
+      const parts = [];
+
+      for (let i = 0; i < presignedUrls.length; i++) {
+        const { presignedUrl, partNumber } = presignedUrls[i];
+        const chunk = chunks[i];
+
+        const response = await fetch(presignedUrl, {
+          method: "PUT",
+          body: chunk,
+          headers: {
+            "Content-Type": file.type,
+          },
+        });
+
+        if (!response.ok) {
+          toast({
+            title: `Failed to upload part ${partNumber}`,
+          });
+        }
+
+        const eTag = response.headers.get("ETag")?.replace(/"/g, "");
+
+        if (!eTag) {
+          toast({
+            title: `No ETag received for part ${partNumber}`,
+          });
+        }
+
+        parts.push({
+          PartNumber: partNumber,
+          ETag: eTag,
+        });
+
+        const fileProgress = Math.round(((i + 1) / presignedUrls.length) * 100);
+        setFileProgress((prev) => ({
+          ...prev,
+          [file.name]: fileProgress,
+        }));
+      }
+
+      const uploadId = new URLSearchParams(
+        new URL(presignedUrls[0].presignedUrl).search
+      ).get("uploadId");
+
+      if (!uploadId) {
+        throw new Error("No uploadId found in presigned URL");
+      }
+
+      const completeResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/complete-multipart-upload`,
         {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            fileKey: key,
+            uploadId,
+            parts: parts,
+          }),
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`);
+      if (!completeResponse.ok) {
+        throw new Error("Failed to complete multipart upload");
       }
 
-      const data = await response.json();
-
-      images.forEach((img, index) => {
-        const fileId = `${category}-${img.name}-${startIndex + index}`;
-        updateProgress(fileId, 100);
-      });
-
-      setCategories((prevCategories) => {
-        const updatedCategories = [...prevCategories];
-        const categoryIndex = updatedCategories.findIndex(
-          (cat) => cat.name === category
-        );
-
-        const updatedFiles = [...updatedCategories[categoryIndex].files];
-        data.fileLinks.forEach((urlObj, idx) => {
-          if (updatedFiles[startIndex + idx]) {
-            updatedFiles[startIndex + idx].tempUrl = urlObj.tempUrl; // Temporary URL for preview
-            updatedFiles[startIndex + idx].compressedUrl = urlObj.compressedUrl; // Compressed URL for album creation
-          }
-        });
-
-        updatedCategories[categoryIndex].files = updatedFiles;
-        updatedCategories[categoryIndex].uploadedUrls.push(
-          ...data.fileLinks.map((urlObj) => urlObj.compressedUrl)
-        );
-        return updatedCategories;
-      });
-
-      return data;
+      return await completeResponse.json();
     } catch (error) {
-      console.error("Upload batch error:", error);
+      console.log(error);
+      if (fileData.fileKey) {
+        const uploadId = new URLSearchParams(
+          new URL(fileData.presignedUrls[0].presignedUrl).search
+        ).get("uploadId");
+
+        if (uploadId) {
+          try {
+            await fetch(
+              `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/abort-multipart-upload`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+                body: JSON.stringify({
+                  fileKey: fileData.fileKey,
+                  uploadId,
+                }),
+              }
+            );
+          } catch (abortError) {
+            console.error("Error aborting upload:", abortError);
+          }
+        }
+      }
       throw error;
     }
   };
 
-  const handleUpload = async (values) => {
-    console.log("Upload started", { values, categories });
-
-    if (
-      !values.studioName ||
-      !values.contactPerson1 ||
-      !values.contactPerson2 ||
-      !values.emailIds
-    ) {
-      toast({
-        title: "Missing required fields",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+  const handleAddCategory = () => {
+    const newCategoryName = prompt("Enter category name:");
+    if (newCategoryName) {
+      setCategories((prevCategories) => [
+        { name: newCategoryName, files: [], uploaded: false },
+        ...prevCategories,
+      ]);
     }
+  };
 
-    if (!categories.some((category) => category.files.length > 0)) {
-      toast({
-        title: "No files selected",
-        description: "Please select files to upload",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleDownload = (file) => {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
+  const handleUploadToS3 = async (values) => {
     setIsUploading(true);
-    setTotalProgress(0);
-    setTotalFilesProcessed(0);
-    const albumPin = generateCode();
-    const uploadedUrls = [];
-    console.log("Generated album pin:", albumPin);
-
-    const uploadToastId = toast({
-      title: "Starting Upload",
-      description: "Preparing files...",
-      duration: Infinity,
-    });
+    setProgress(0);
+    setFileProgress({});
 
     try {
-      for (const category of categories) {
-        if (!category.files.length) continue;
-        console.log(
-          `Processing category: ${category.name} with ${category.files.length} files`
-        );
-
-        const totalBatches = Math.ceil(category.files.length / BATCH_SIZE);
-        const categoryUrls = [];
-
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-          const startIndex = batchIndex * BATCH_SIZE;
-          const endIndex = Math.min(
-            (batchIndex + 1) * BATCH_SIZE,
-            category.files.length
-          );
-          const batch = category.files.slice(startIndex, endIndex);
-
-          console.log(
-            `Uploading batch ${batchIndex + 1} of ${totalBatches} for ${
-              category.name
-            }`
-          );
-
-          try {
-            const batchResponse = await uploadImageBatch(
-              batch,
-              albumPin,
-              category.name,
-              startIndex,
-              (fileId, progress) => {
-                setUploadProgress((prev) => ({
-                  ...prev,
-                  [fileId]: progress,
-                }));
-              }
-            );
-
-            if (batchResponse && batchResponse.fileLinks) {
-              categoryUrls.push(
-                ...batchResponse.fileLinks.map((urlObj, index) => ({
-                  url: urlObj.compressedUrl, 
-                  name: batch[index].name,
-                  category: category.name,
-                }))
-              );
-            }
-
-            setTotalFilesProcessed((prev) => {
-              const newProcessed = prev + batch.length;
-              const totalProgressPercent = (newProcessed / totalFiles) * 100;
-              setTotalProgress(totalProgressPercent);
-              return newProcessed;
-            });
-          } catch (error) {
-            console.error(`Batch upload error:`, error);
-            toast({
-              title: `Failed to upload batch ${batchIndex + 1}`,
-              description: error.message,
-              variant: "destructive",
-            });
-            throw error;
-          }
+      const presignedResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/get-presigned-urls`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            categories: categories.map((category) => ({
+              name: category.name,
+              files: category.files.map((file) => ({
+                fileName: file.name,
+                contentType: file.type,
+                fileSize: file.size,
+              })),
+            })),
+          }),
         }
+      );
 
-        uploadedUrls.push({
-          category: category.name,
-          urls: categoryUrls,
-        });
+      if (!presignedResponse.ok) {
+        throw new Error("Failed to get presigned URLs");
       }
 
-      console.log("All files uploaded, creating album");
-      const categoryImages = uploadedUrls.map((categoryData) => ({
-        category: categoryData.category,
-        images: categoryData.urls.map((urlData) => ({
-          key: urlData.url,
-          url: urlData.url,
-          mimeType:
-            urlData.name.split(".").pop().toLowerCase() === "webp"
-              ? "image/webp"
-              : "image/jpeg",
-        })),
-      }));
+      const presignedData = await presignedResponse.json();
+      const { presignedUrls, pin } = presignedData.data;
 
-      const albumPayload = {
+      let uploadedFiles = 0;
+      const totalFiles = categories.reduce(
+        (acc, category) => acc + category.files.length,
+        0
+      );
+
+      const payload = {
         name: title,
         contactPerson: [values.contactPerson1, values.contactPerson2],
-        emailIds: values.emailIds.split(",").map((email) => email.trim()),
-        images: categoryImages,
-        profileAttached: values.attachProfile,
-        isSingleSlided: values.singleSided,
-        code: albumPin,
         action: "E_ALBUM",
+        song: "song.mp3",
+        emailIds: [values.emailIds],
+        images: [],
+        profileAttached: values.profileAttached,
+        isSingleSlided: values.isSingleSlided,
+        code: pin,
       };
 
-      console.log("Sending album creation payload:", albumPayload);
+      for (const categoryData of presignedUrls) {
+        const category = categories.find(
+          (cat) => cat.name === categoryData.category
+        );
+        const images = [];
+
+        for (const fileData of categoryData.files) {
+          const file = category.files.find((f) => f.name === fileData.fileName);
+
+          await uploadFileChunks(fileData, file);
+
+          images.push({
+            key: fileData.key,
+            mimeType: file.type,
+          });
+
+          uploadedFiles++;
+          setProgress(Math.round((uploadedFiles / totalFiles) * 100));
+          setTotalFilesProcessed(uploadedFiles);
+        }
+
+        payload.images.push({
+          category: categoryData.category,
+          images,
+        });
+      }
 
       const createResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/create`,
@@ -362,7 +335,7 @@ export default function CreateAlbumPage() {
             "Content-Type": "application/json",
             authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify(albumPayload),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -371,41 +344,34 @@ export default function CreateAlbumPage() {
       }
 
       const createData = await createResponse.json();
-      console.log("Album created successfully:", createData);
-      setAlbum(createData.data);
-      setIsDialogOpen(true);
+      console.log(createData.data);
 
-      dismiss(uploadToastId);
+      setAlbum({
+        name: createData.data.name,
+        code: createData.data.code,
+      });
       toast({
         title: "Album created successfully",
-        description: `All files uploaded successfully`,
-        duration: 5000,
       });
+      setIsDialogOpen(true);
     } catch (error) {
-      console.error("Album creation error:", error);
-      dismiss(uploadToastId);
+      console.error(error);
       toast({
         title: "Failed to create album",
-        description: error.message,
+        message: error.message,
         variant: "destructive",
       });
     } finally {
       setIsUploading(false);
-      categories.forEach((category) => {
-        category.files.forEach((fileObj) => {
-          if (fileObj.preview) {
-            URL.revokeObjectURL(fileObj.preview);
-          }
-        });
+      form.reset({
+        studioName: "",
+        contactPerson1: "",
+        contactPerson2: "",
+        emailIds: "",
+        attachProfile: false,
+        singleSided: false,
       });
     }
-  };
-  const handleFileUpload = (files, categoryIndex) => {
-    setCategories((prevCategories) => {
-      const updatedCategories = [...prevCategories];
-      updatedCategories[categoryIndex].files = files;
-      return updatedCategories;
-    });
   };
 
   return (
@@ -424,7 +390,7 @@ export default function CreateAlbumPage() {
           <div className="flex gap-2">
             <Button>Copy And Share</Button>
             <Button
-              onClick={form.handleSubmit(handleUpload)}
+              onClick={form.handleSubmit(handleUploadToS3)}
               disabled={isUploading}
             >
               {isUploading ? (
@@ -443,7 +409,7 @@ export default function CreateAlbumPage() {
 
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(handleUpload)}
+                onSubmit={form.handleSubmit(handleUploadToS3)}
                 className="space-y-8"
               >
                 <div className="grid gap-6">
@@ -470,11 +436,7 @@ export default function CreateAlbumPage() {
                         <FormItem>
                           <FormLabel>Studio Name</FormLabel>
                           <FormControl>
-                            <Input
-                              disabled
-                              placeholder="Enter Studio Name"
-                              {...field}
-                            />
+                            <Input placeholder="Enter Studio Name" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -582,14 +544,14 @@ export default function CreateAlbumPage() {
                   <div className={`${isUploading ? "block" : "hidden"}`}>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium">
-                        Uploading - {Math.round(totalProgress)}%
+                        Uploading - {Math.round(progress)}%
                       </span>
                       <span className="text-sm text-muted-foreground">
                         {totalFilesProcessed} / {totalFiles} images
                       </span>
                     </div>
                     <Progress
-                      value={totalProgress}
+                      value={progress}
                       max={100}
                       className="h-2 w-full bg-gray-200"
                     />
@@ -628,18 +590,22 @@ export default function CreateAlbumPage() {
                             </div>
                             <AccordionContent>
                               <div className="grid gap-4">
-                                <FileUpload
-                                  onChange={(files) =>
-                                    handleFileUpload(files, categoryIndex)
-                                  }
-                                  accept="image/*"
+                                <Input
+                                  type="file"
                                   multiple
-                                  disabled={isUploading}
+                                  className="border-dashed"
+                                  onChange={(e) =>
+                                    handleFileUpload(
+                                      e.target.files,
+                                      categoryIndex
+                                    )
+                                  }
+                                  disabled={isUploading || category.uploaded}
                                 />
 
                                 {category.files.map((file, fileIndex) => {
                                   const fileId = `${category.name}-${file.name}-${fileIndex}`;
-                                  const progress = uploadProgress[fileId] || 0;
+                                  const progress = fileProgress[fileId] || 0;
 
                                   return (
                                     <div
@@ -648,11 +614,11 @@ export default function CreateAlbumPage() {
                                     >
                                       <div className="flex items-center space-x-4">
                                         <div className="w-12 h-12 bg-gray-200 flex-shrink-0 rounded overflow-hidden">
-                                          {file.tempUrl || file.preview ? (
+                                          {file.preview ? (
                                             <Image
                                               width={48}
                                               height={48}
-                                              src={file.tempUrl || file.preview} // Use tempUrl for preview
+                                              src={file.preview}
                                               alt={file.name}
                                               className="object-cover w-full h-full"
                                             />
@@ -687,24 +653,16 @@ export default function CreateAlbumPage() {
                                             className="w-32 h-2 bg-gray-200 rounded"
                                           />
                                         </div>
-                                        {file.compressedUrl && (
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={
-                                              () =>
-                                                handleDownload(
-                                                  file.compressedUrl,
-                                                  file.name
-                                                ) 
-                                            }
-                                            className="ml-2"
-                                          >
-                                            <Download className="w-4 h-4 mr-1" />
-                                            Download
-                                          </Button>
-                                        )}
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleDownload(file)}
+                                          className="ml-2"
+                                        >
+                                          <Download className="w-4 h-4 mr-1" />
+                                          Download
+                                        </Button>
                                       </div>
                                     </div>
                                   );

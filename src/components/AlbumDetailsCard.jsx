@@ -17,7 +17,7 @@ export default function ShareDialog({ album }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
-  const downloadAppLink = `https://${user?.studioName}.ealbum.com/get?code=${album.code}`;
+  const downloadAppLink = `https://${user?.studioName}.ealbum.com/get?code=${album?.code}`;
 
   const copyToClipboard = () => {
     const text = `${album.name}\nAlbum Access Code: ${album.code}\nDownload app: ${downloadAppLink}`;

@@ -37,28 +37,7 @@ const AlbumDetails = () => {
     }
   }, [albumId]);
 
-  useEffect(() => {
-    const fetchAlbumStatus = async () => {
-      if (!album?.code) return;
-
-      setStatusLoading(true);
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/album-status/${album.code}`
-        );
-        const data = await response.json();
-        if (data.success) {
-          setAlbumStatus(data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching album status:", error);
-      } finally {
-        setStatusLoading(false);
-      }
-    };
-
-    fetchAlbumStatus();
-  }, [album?.code]);
+  console.log(album)
 
   const copyCode = () => {
     navigator.clipboard.writeText(album.code);
@@ -68,16 +47,15 @@ const AlbumDetails = () => {
 
   const handleDownload = async (file) => {
     try {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_STORAGE_URL}/file/download/${file.key
-          .split("/")
-          .pop()}`,
-        {
-          responseType: "blob",
-        }
-      );
+      // Fetch the image as a blob
+      const response = await axios.get(file.url, {
+        responseType: "blob",
+      });
 
-      const filename = file.key.split("/").pop() || `image_${file.id}`;
+      // Extract the filename from the URL or use a default name
+      const filename = file.key.split("/").pop() || `image_${file.id}.jpg`;
+
+      // Create a download link
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -223,7 +201,7 @@ const AlbumDetails = () => {
                 {category.files.map((file) => (
                   <div key={file.id} className="relative aspect-square group">
                     <Image
-                      src={file.key}
+                      src={file.url} // Use the presigned URL from the response
                       alt={`Image ${file.id}`}
                       fill
                       className="object-cover rounded-lg"
