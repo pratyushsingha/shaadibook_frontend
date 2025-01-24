@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/accordion";
 import Image from "next/image";
 
-const CHUNK_SIZE = 5 * 1024 * 1024;
+const CHUNK_SIZE = 10 * 1024 * 1024;
 
 const formSchema = z.object({
   studioName: z.string().min(2, {
