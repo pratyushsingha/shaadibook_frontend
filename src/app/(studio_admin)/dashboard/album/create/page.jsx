@@ -161,6 +161,7 @@ export default function CreateAlbumPage() {
           ETag: eTag,
         });
 
+        // Update progress for this file
         const fileProgress = Math.round(((i + 1) / presignedUrls.length) * 100);
         setFileProgress((prev) => ({
           ...prev,
@@ -605,7 +606,7 @@ export default function CreateAlbumPage() {
 
                                 {category.files.map((file, fileIndex) => {
                                   const fileId = `${category.name}-${file.name}-${fileIndex}`;
-                                  const progress = fileProgress[fileId] || 0;
+                                  const progress = fileProgress[file.name] || 0; 
 
                                   return (
                                     <div
