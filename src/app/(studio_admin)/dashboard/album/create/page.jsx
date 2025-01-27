@@ -296,8 +296,8 @@ export default function CreateAlbumPage() {
         song: "song.mp3",
         emailIds: [values.emailIds],
         images: [],
-        profileAttached: values.profileAttached,
-        isSingleSlided: values.isSingleSlided,
+        profileAttached: values.attachProfile,
+        isSingleSlided: values.singleSided,
         code: pin,
       };
 
@@ -310,7 +310,17 @@ export default function CreateAlbumPage() {
         for (const fileData of categoryData.files) {
           const file = category.files.find((f) => f.name === fileData.fileName);
 
-          await uploadFileChunks(fileData, file);
+          const uploadResponse = await fetch(fileData.presignedUrl, {
+            method: "PUT",
+            body: file,
+            headers: {
+              "Content-Type": file.type,
+            },
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload file: ${file.name}`);
+          }
 
           images.push({
             key: fileData.key,
@@ -320,6 +330,11 @@ export default function CreateAlbumPage() {
           uploadedFiles++;
           setProgress(Math.round((uploadedFiles / totalFiles) * 100));
           setTotalFilesProcessed(uploadedFiles);
+
+          setFileProgress((prev) => ({
+            ...prev,
+            [file.name]: 100,
+          }));
         }
 
         payload.images.push({
@@ -606,7 +621,7 @@ export default function CreateAlbumPage() {
 
                                 {category.files.map((file, fileIndex) => {
                                   const fileId = `${category.name}-${file.name}-${fileIndex}`;
-                                  const progress = fileProgress[file.name] || 0; 
+                                  const progress = fileProgress[file.name] || 0;
 
                                   return (
                                     <div

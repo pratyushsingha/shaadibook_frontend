@@ -48,7 +48,7 @@ const LoginForm = ({ signupRoute }) => {
   useEffect(() => {
     if (isAuthenticated === true) {
       toast({
-        title: `welcome ${user}`,
+        title: `welcome ${user.name ?? user}`,
       });
       setTimeout(() => {
         router.push(

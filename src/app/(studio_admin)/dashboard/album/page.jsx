@@ -20,6 +20,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 
@@ -30,6 +31,7 @@ const AlbumDetails = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [albumStatus, setAlbumStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [categoryImages, setCategoryImages] = useState({});
 
   useEffect(() => {
     if (albumId) {
@@ -37,7 +39,21 @@ const AlbumDetails = () => {
     }
   }, [albumId]);
 
-  console.log(album)
+  const fetchCategoryImages = async (categoryId) => {
+    try {
+      console.log(categoryId);
+      const response = await api.get(`album/details`, {
+        categoryId: "cm6bufbiq0003sy27jmiavwis",
+      });
+      console.log(response);
+      setCategoryImages((prev) => ({
+        ...prev,
+        [categoryId]: response.data.data.albumCategoryImages,
+      }));
+    } catch (error) {
+      console.error("Failed to fetch category images:", error);
+    }
+  };
 
   const copyCode = () => {
     navigator.clipboard.writeText(album.code);
@@ -47,15 +63,10 @@ const AlbumDetails = () => {
 
   const handleDownload = async (file) => {
     try {
-      // Fetch the image as a blob
       const response = await axios.get(file.url, {
         responseType: "blob",
       });
-
-      // Extract the filename from the URL or use a default name
       const filename = file.key.split("/").pop() || `image_${file.id}.jpg`;
-
-      // Create a download link
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -192,16 +203,20 @@ const AlbumDetails = () => {
 
       <Accordion type="multiple" className="w-full">
         {album?.AlbumCategory?.map((category) => (
-          <AccordionItem key={category.id} value={category.id}>
+          <AccordionItem
+            key={category.id}
+            value={category.id}
+            onFocus={() => fetchCategoryImages(category.id)}
+          >
             <AccordionTrigger className="text-xl font-semibold">
               {category.name}
             </AccordionTrigger>
             <AccordionContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {category.files.map((file) => (
+                {categoryImages[category.id]?.map((file) => (
                   <div key={file.id} className="relative aspect-square group">
                     <Image
-                      src={file.url} // Use the presigned URL from the response
+                      src={file.key}
                       alt={`Image ${file.id}`}
                       fill
                       className="object-cover rounded-lg"
