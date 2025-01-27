@@ -69,9 +69,7 @@ export default function CreateAlbumPage() {
   const [album, setAlbum] = useState({ name: "", code: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [categories, setCategories] = useState([
-    { name: "Engagement", files: [], uploaded: false },
-  ]);
+  const [categories, setCategories] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [fileProgress, setFileProgress] = useState({});
