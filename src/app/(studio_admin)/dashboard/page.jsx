@@ -23,13 +23,16 @@ function page() {
   const { toast } = useToast();
   const [albumCreateLoader, setAlbumCreateLoader] = useState(false);
 
+
   const handleCreateProject = () => {
     setAlbumCreateLoader(true);
 
     if (projectTitle.trim()) {
       setTimeout(() => {
         router.push(
-          `/dashboard/album/create?title=${encodeURIComponent(projectTitle)}`
+          `/dashboard/album/create?title=${encodeURIComponent(
+            projectTitle
+          )}`
         );
       }, 100);
     } else {

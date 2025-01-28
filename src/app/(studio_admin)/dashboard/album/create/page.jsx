@@ -1,5 +1,5 @@
 "use client";
-
+import React, { useState, useEffect, useRef } from "react";
 import { Search, Plus, Trash2, Loader2, Mail, Download } from "lucide-react";
 import {
   Form,
@@ -17,16 +17,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import AlbumDetailsCard from "@/components/AlbumDetailsCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import AlbumDetailsCard from "@/components/AlbumDetailsCard";
 import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
@@ -35,8 +34,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Image from "next/image";
-
-const CHUNK_SIZE = 10 * 1024 * 1024;
 
 const formSchema = z.object({
   studioName: z.string().min(2, {
@@ -64,6 +61,130 @@ const formSchema = z.object({
   singleSided: z.boolean().default(false),
 });
 
+const FileUploadCard = ({
+  file,
+  fileId,
+  progress,
+  onDownload,
+  uploadStartTime,
+  bytesUploaded,
+}) => {
+  const [uploadSpeed, setUploadSpeed] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const lastUpdateTime = useRef(Date.now());
+  const lastBytesUploaded = useRef(0);
+
+  useEffect(() => {
+    if (progress > 0 && progress < 100 && uploadStartTime) {
+      const now = Date.now();
+      const timeDiff = now - lastUpdateTime.current;
+
+      if (timeDiff > 1000) {
+        const bytesDiff = bytesUploaded - lastBytesUploaded.current;
+        const currentSpeed = (bytesDiff / timeDiff) * 1000;
+
+        setUploadSpeed(currentSpeed);
+
+        const remainingBytes = file.size - bytesUploaded;
+        const timeRemainingSeconds =
+          currentSpeed > 0 ? remainingBytes / currentSpeed : 0;
+        setTimeRemaining(timeRemainingSeconds);
+
+        lastUpdateTime.current = now;
+        lastBytesUploaded.current = bytesUploaded;
+      }
+    }
+  }, [progress, bytesUploaded, file.size, uploadStartTime]);
+
+  const formatTime = (seconds) => {
+    if (!seconds || seconds === Infinity) return "Calculating...";
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
+  const formatBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes.toFixed(1)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const formatSpeed = (bytesPerSecond) => {
+    if (bytesPerSecond === 0) return "Calculating...";
+    if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(1)} B/s`;
+    if (bytesPerSecond < 1024 * 1024)
+      return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+    return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 border rounded-lg bg-white shadow-sm">
+      <div className="flex items-center space-x-4">
+        <div className="w-12 h-12 bg-gray-200 flex-shrink-0 rounded overflow-hidden">
+          {file.preview ? (
+            <Image
+              width={48}
+              height={48}
+              src={file.preview}
+              alt={file.name}
+              className="object-cover w-full h-full"
+            />
+          ) : (
+            <div className="w-full h-full animate-pulse bg-gray-300" />
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-800 truncate">
+            {file.name}
+          </p>
+          <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        <div className="flex flex-col space-y-1 min-w-[250px]">
+          {progress < 100 ? (
+            <>
+              <div className="flex justify-between text-xs">
+                <span className="text-blue-500">
+                  Uploading... ({progress}%)
+                </span>
+                <span className="text-gray-500">
+                  {formatBytes(bytesUploaded)} / {formatBytes(file.size)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>{formatSpeed(uploadSpeed)}</span>
+                <span>ETA: {formatTime(timeRemaining)}</span>
+              </div>
+              <Progress
+                value={progress}
+                max={100}
+                className="h-2 bg-gray-200 rounded"
+              />
+            </>
+          ) : (
+            <span className="text-sm text-green-500">
+              Uploaded Successfully
+            </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onDownload(file)}
+          className="ml-2"
+        >
+          <Download className="w-4 h-4 mr-1" />
+          Download
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export default function CreateAlbumPage() {
   const { toast } = useToast();
   const [album, setAlbum] = useState({ name: "", code: "" });
@@ -75,6 +196,44 @@ export default function CreateAlbumPage() {
   const [fileProgress, setFileProgress] = useState({});
   const [totalFilesProcessed, setTotalFilesProcessed] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
+  const [uploadTimes, setUploadTimes] = useState({});
+  const [uploadedBytes, setUploadedBytes] = useState({});
+
+  const uploadFileWithProgress = async (file, presignedUrl) => {
+    const xhr = new XMLHttpRequest();
+
+    return new Promise((resolve, reject) => {
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setFileProgress((prev) => ({
+            ...prev,
+            [file.name]: Math.round(percentComplete),
+          }));
+          setUploadedBytes((prev) => ({
+            ...prev,
+            [file.name]: event.loaded,
+          }));
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status === 200) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status: ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new Error("Upload failed"));
+      });
+
+      xhr.open("PUT", presignedUrl, true);
+      xhr.setRequestHeader("Content-Type", file.type);
+      xhr.send(file);
+    });
+  };
 
   useEffect(() => {
     const total = categories.reduce(
@@ -105,127 +264,30 @@ export default function CreateAlbumPage() {
     const updatedCategories = [...categories];
     const category = updatedCategories[categoryIndex];
 
-    category.files = [...category.files, ...Array.from(files)];
+    // Create object URLs for previews
+    const filesWithPreviews = Array.from(files).map((file) => {
+      if (file.type.startsWith("image/")) {
+        return Object.assign(file, {
+          preview: URL.createObjectURL(file),
+        });
+      }
+      return file;
+    });
+
+    category.files = [...category.files, ...filesWithPreviews];
     setCategories(updatedCategories);
   };
 
   const handleRemoveFile = (categoryIndex, fileIndex) => {
     const updatedCategories = [...categories];
+    const file = updatedCategories[categoryIndex].files[fileIndex];
+
+    if (file.preview) {
+      URL.revokeObjectURL(file.preview);
+    }
+
     updatedCategories[categoryIndex].files.splice(fileIndex, 1);
     setCategories(updatedCategories);
-  };
-
-  const uploadFileChunks = async (fileData, file) => {
-    try {
-      const chunks = [];
-      let start = 0;
-      while (start < file.size) {
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        chunks.push(file.slice(start, end));
-        start = end;
-      }
-
-      const { key, presignedUrls } = fileData;
-      const parts = [];
-
-      for (let i = 0; i < presignedUrls.length; i++) {
-        const { presignedUrl, partNumber } = presignedUrls[i];
-        const chunk = chunks[i];
-
-        const response = await fetch(presignedUrl, {
-          method: "PUT",
-          body: chunk,
-          headers: {
-            "Content-Type": file.type,
-          },
-        });
-
-        if (!response.ok) {
-          toast({
-            title: `Failed to upload part ${partNumber}`,
-          });
-        }
-
-        const eTag = response.headers.get("ETag")?.replace(/"/g, "");
-
-        if (!eTag) {
-          toast({
-            title: `No ETag received for part ${partNumber}`,
-          });
-        }
-
-        parts.push({
-          PartNumber: partNumber,
-          ETag: eTag,
-        });
-
-        // Update progress for this file
-        const fileProgress = Math.round(((i + 1) / presignedUrls.length) * 100);
-        setFileProgress((prev) => ({
-          ...prev,
-          [file.name]: fileProgress,
-        }));
-      }
-
-      const uploadId = new URLSearchParams(
-        new URL(presignedUrls[0].presignedUrl).search
-      ).get("uploadId");
-
-      if (!uploadId) {
-        throw new Error("No uploadId found in presigned URL");
-      }
-
-      const completeResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/complete-multipart-upload`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({
-            fileKey: key,
-            uploadId,
-            parts: parts,
-          }),
-        }
-      );
-
-      if (!completeResponse.ok) {
-        throw new Error("Failed to complete multipart upload");
-      }
-
-      return await completeResponse.json();
-    } catch (error) {
-      console.log(error);
-      if (fileData.fileKey) {
-        const uploadId = new URLSearchParams(
-          new URL(fileData.presignedUrls[0].presignedUrl).search
-        ).get("uploadId");
-
-        if (uploadId) {
-          try {
-            await fetch(
-              `${process.env.NEXT_PUBLIC_BACKEND_URL}/album/abort-multipart-upload`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-                body: JSON.stringify({
-                  fileKey: fileData.fileKey,
-                  uploadId,
-                }),
-              }
-            );
-          } catch (abortError) {
-            console.error("Error aborting upload:", abortError);
-          }
-        }
-      }
-      throw error;
-    }
   };
 
   const handleAddCategory = () => {
@@ -251,6 +313,8 @@ export default function CreateAlbumPage() {
     setIsUploading(true);
     setProgress(0);
     setFileProgress({});
+    setUploadTimes({});
+    setUploadedBytes({});
 
     try {
       const presignedResponse = await fetch(
@@ -282,11 +346,6 @@ export default function CreateAlbumPage() {
       const { presignedUrls, pin } = presignedData.data;
 
       let uploadedFiles = 0;
-      const totalFiles = categories.reduce(
-        (acc, category) => acc + category.files.length,
-        0
-      );
-
       const payload = {
         name: title,
         contactPerson: [values.contactPerson1, values.contactPerson2],
@@ -308,31 +367,26 @@ export default function CreateAlbumPage() {
         for (const fileData of categoryData.files) {
           const file = category.files.find((f) => f.name === fileData.fileName);
 
-          const uploadResponse = await fetch(fileData.presignedUrl, {
-            method: "PUT",
-            body: file,
-            headers: {
-              "Content-Type": file.type,
-            },
-          });
-
-          if (!uploadResponse.ok) {
-            throw new Error(`Failed to upload file: ${file.name}`);
-          }
-
-          images.push({
-            key: fileData.key,
-            mimeType: file.type,
-          });
-
-          uploadedFiles++;
-          setProgress(Math.round((uploadedFiles / totalFiles) * 100));
-          setTotalFilesProcessed(uploadedFiles);
-
-          setFileProgress((prev) => ({
+          setUploadTimes((prev) => ({
             ...prev,
-            [file.name]: 100,
+            [file.name]: Date.now(),
           }));
+
+          try {
+            await uploadFileWithProgress(file, fileData.presignedUrl);
+
+            images.push({
+              key: fileData.key,
+              mimeType: file.type,
+            });
+
+            uploadedFiles++;
+            setProgress(Math.round((uploadedFiles / totalFiles) * 100));
+            setTotalFilesProcessed(uploadedFiles);
+          } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+            throw error;
+          }
         }
 
         payload.images.push({
@@ -358,8 +412,6 @@ export default function CreateAlbumPage() {
       }
 
       const createData = await createResponse.json();
-      console.log(createData.data);
-
       setAlbum({
         name: createData.data.name,
         code: createData.data.code,
@@ -377,16 +429,20 @@ export default function CreateAlbumPage() {
       });
     } finally {
       setIsUploading(false);
-      form.reset({
-        studioName: "",
-        contactPerson1: "",
-        contactPerson2: "",
-        emailIds: "",
-        attachProfile: false,
-        singleSided: false,
-      });
     }
   };
+
+  useEffect(() => {
+    return () => {
+      categories.forEach((category) => {
+        category.files.forEach((file) => {
+          if (file.preview) {
+            URL.revokeObjectURL(file.preview);
+          }
+        });
+      });
+    };
+  }, []);
 
   return (
     <>
@@ -493,7 +549,11 @@ export default function CreateAlbumPage() {
                   <div className="grid gap-4 md:grid-cols-3">
                     <div>
                       <Label>Song(Will play while viewing album)</Label>
-                      <Input type="file" className="cursor-pointer" />
+                      <Input
+                        type="file"
+                        className="cursor-pointer"
+                        accept="audio/*"
+                      />
                     </div>
                     <div className="flex items-end gap-4">
                       <FormField
@@ -607,6 +667,7 @@ export default function CreateAlbumPage() {
                                 <Input
                                   type="file"
                                   multiple
+                                  accept="image/*"
                                   className="border-dashed"
                                   onChange={(e) =>
                                     handleFileUpload(
@@ -620,65 +681,18 @@ export default function CreateAlbumPage() {
                                 {category.files.map((file, fileIndex) => {
                                   const fileId = `${category.name}-${file.name}-${fileIndex}`;
                                   const progress = fileProgress[file.name] || 0;
-
                                   return (
-                                    <div
+                                    <FileUploadCard
                                       key={fileId}
-                                      className="flex items-center justify-between p-3 border rounded-lg bg-white shadow-sm"
-                                    >
-                                      <div className="flex items-center space-x-4">
-                                        <div className="w-12 h-12 bg-gray-200 flex-shrink-0 rounded overflow-hidden">
-                                          {file.preview ? (
-                                            <Image
-                                              width={48}
-                                              height={48}
-                                              src={file.preview}
-                                              alt={file.name}
-                                              className="object-cover w-full h-full"
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full animate-pulse bg-gray-300"></div>
-                                          )}
-                                        </div>
-                                        <div>
-                                          <p className="text-sm font-medium text-gray-800 truncate">
-                                            {file.name}
-                                          </p>
-                                          <p className="text-xs text-gray-500">
-                                            {Math.round(file.size / 1024)} KB
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="flex items-center space-x-4">
-                                        <div className="flex items-center space-x-2">
-                                          {progress < 100 ? (
-                                            <span className="text-sm text-blue-500">
-                                              Uploading... ({progress}%)
-                                            </span>
-                                          ) : (
-                                            <span className="text-sm text-green-500">
-                                              Uploaded
-                                            </span>
-                                          )}
-                                          <Progress
-                                            value={progress}
-                                            max={100}
-                                            className="w-32 h-2 bg-gray-200 rounded"
-                                          />
-                                        </div>
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handleDownload(file)}
-                                          className="ml-2"
-                                        >
-                                          <Download className="w-4 h-4 mr-1" />
-                                          Download
-                                        </Button>
-                                      </div>
-                                    </div>
+                                      file={file}
+                                      fileId={fileId}
+                                      progress={progress}
+                                      onDownload={handleDownload}
+                                      uploadStartTime={uploadTimes[file.name]}
+                                      bytesUploaded={
+                                        uploadedBytes[file.name] || 0
+                                      }
+                                    />
                                   );
                                 })}
                               </div>
@@ -693,12 +707,9 @@ export default function CreateAlbumPage() {
             </Form>
           </CardContent>
         </Card>
-        <Dialog
-          className="w-10/12"
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-        >
-          <DialogContent>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-md">
             <AlbumDetailsCard album={album} />
           </DialogContent>
         </Dialog>
