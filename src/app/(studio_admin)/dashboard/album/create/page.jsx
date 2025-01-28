@@ -122,7 +122,7 @@ const FileUploadCard = ({
     <div className="flex items-center justify-between p-3 border rounded-lg bg-white shadow-sm">
       <div className="flex items-center space-x-4">
         <div className="w-12 h-12 bg-gray-200 flex-shrink-0 rounded overflow-hidden">
-          {file.preview ? (
+          {/* {file.preview ? (
             <Image
               width={48}
               height={48}
@@ -132,7 +132,8 @@ const FileUploadCard = ({
             />
           ) : (
             <div className="w-full h-full animate-pulse bg-gray-300" />
-          )}
+          )} */}
+            <div className="w-full h-full animate-pulse bg-gray-300" />
         </div>
         <div>
           <p className="text-sm font-medium text-gray-800 truncate">
