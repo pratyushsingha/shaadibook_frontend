@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import useAlbum from "../../../../store/useAlbum";
 import { useSearchParams } from "next/navigation";
 import Loader from "@/components/loader/Loader";
@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const Page = () => {
+const AlbumDetails = () => {
   const searchParams = useSearchParams();
   const albumId = searchParams.get("albumId");
   const { getAlbumDetailsById, album, loading, error } = useAlbum();
@@ -160,10 +160,7 @@ const Page = () => {
         </h2>
         <Accordion type="multiple" className="w-full space-y-3">
           {album?.AlbumCategory?.map((category) => (
-            <div
-              key={category.id}
-              className="bg-[#FBF9FC] rounded-lg p-6"
-            >
+            <div key={category.id} className="bg-[#FBF9FC] rounded-lg p-6">
               <AccordionItem
                 key={category.id}
                 value={category.id}
@@ -198,6 +195,12 @@ const Page = () => {
     </div>
   );
 };
+
+const Page = () => (
+  <Suspense fallback={<Loader />}>
+    <AlbumDetails />
+  </Suspense>
+);
 
 export default Page;
 
