@@ -51,9 +51,7 @@ const LoginForm = ({ signupRoute }) => {
         title: `welcome ${user.name ?? user}`,
       });
       setTimeout(() => {
-        router.push(
-          `${user?.role === "STUDIO_ADMIN" ? "/dashboard" : "/admin/dashboard"}`
-        );
+        router.push("/dashboard");
       }, 1500);
     }
     if (error && typeof error === "object") {

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       "localhost",
       "media.shaadialbum.in",
       "shaaadibook.s3.ap-south-1.amazonaws.com",
+      "source.unsplash.com"
     ],
   },
 };

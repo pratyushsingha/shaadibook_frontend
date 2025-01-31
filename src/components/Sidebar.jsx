@@ -17,7 +17,7 @@ import { usePathname } from "next/navigation";
 export function DashboardSidebar({ user, sidebarItems }) {
   const pathname = usePathname();
   return (
-    <Sidebar className="border-r">
+    <Sidebar className="border-r ">
       <SidebarHeader className="border-b p-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Image width={50} height={50} src="/logo.png" alt="sidebar logo" />

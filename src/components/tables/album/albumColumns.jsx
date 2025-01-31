@@ -46,7 +46,7 @@ export const albumColumns = [
     },
     cell: ({ row }) => (
       <Link href={`/dashboard/album?albumId=${row.getValue("id")}`}>
-        <p className="text-blue-600 underline">${row.getValue("id")}</p>
+        <p className="text-blue-600 underline">{row.getValue("id")}</p>
       </Link>
     ),
   },

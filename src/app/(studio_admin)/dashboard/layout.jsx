@@ -53,8 +53,8 @@ export default function RootLayout({ children }) {
     <SidebarProvider>
       <div className="flex h-screen w-screen">
         <DashboardSidebar user={user} sidebarItems={sidebarItems} />
-        <div className="flex-1 flex flex-col">
-          <header className="flex items-center justify-between bg-gradient-to-r from-[#7B2991] to-[#4F2D82]  px-6 py-1 md:py-4 text-white rounded md:rounded-l-2xl">
+        <div className="flex-1 flex flex-col ">
+          <header className="flex sticky bg-white top-0 z-50 p-4 items-center justify-between bg-gradient-to-r from-[#7B2991] to-[#4F2D82]  px-6 py-1 md:py-4 text-white rounded md:rounded-l-2xl">
             <div className="space-x-3 flex">
               <SidebarTrigger />
               <h1 className="md:text-2xl font-extrabold self-center">
